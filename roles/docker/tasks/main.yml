@@ -1,0 +1,81 @@
+---
+# roles/docker/tasks/main.yml
+
+- name: Vérifier si Docker est déjà installé
+  stat:
+    path: /Applications/Docker.app
+  register: docker_app
+
+- name: Installer Docker Desktop via Homebrew Cask
+  community.general.homebrew_cask:
+    name: docker
+    state: present
+  when: not docker_app.stat.exists
+
+- name: Démarrer Docker Desktop
+  command: open -a Docker
+  changed_when: false
+  when: not docker_app.stat.exists
+
+- name: Attendre que le daemon Docker soit disponible
+  command: docker info
+  register: docker_info
+  until: docker_info.rc == 0
+  retries: 30
+  delay: 10
+  changed_when: false
+
+- name: Installer le plugin Docker Compose v2
+  command: docker plugin install docker/compose
+  changed_when: false
+  failed_when: false
+
+- name: Vérifier la version de Docker
+  command: docker --version
+  register: docker_version
+  changed_when: false
+
+- name: Afficher la version Docker
+  debug:
+    msg: "{{ docker_version.stdout }}"
+
+- name: Configurer Docker pour démarrer au login
+  copy:
+    dest: "{{ ansible_env.HOME }}/Library/LaunchAgents/com.docker.helper.plist"
+    mode: '0644'
+    content: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+        "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0">
+      <dict>
+        <key>Label</key>
+        <string>com.docker.helper</string>
+        <key>ProgramArguments</key>
+        <array>
+          <string>open</string>
+          <string>-a</string>
+          <string>Docker</string>
+        </array>
+        <key>RunAtLoad</key>
+        <true/>
+      </dict>
+      </plist>
+
+- name: Configurer le daemon Docker (ressources et log rotation)
+  copy:
+    dest: "{{ ansible_env.HOME }}/.docker/daemon.json"
+    mode: '0640'
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "5"
+        },
+        "dns": ["1.1.1.1", "8.8.8.8"]
+      }
+
+- name: Installer la collection Ansible pour Docker
+  command: ansible-galaxy collection install community.docker
+  changed_when: false

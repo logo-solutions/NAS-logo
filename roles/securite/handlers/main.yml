@@ -1,0 +1,4 @@
+---
+- name: Recharger Caddy
+  command: brew services restart caddy
+  changed_when: false

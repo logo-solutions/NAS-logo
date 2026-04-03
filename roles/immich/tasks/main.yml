@@ -1,0 +1,46 @@
+---
+# roles/immich/tasks/main.yml
+
+- name: Créer le répertoire de config Immich
+  file:
+    path: "{{ immich_install_dir }}"
+    state: directory
+    mode: '0750'
+
+- name: Déployer le fichier docker-compose.yml
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ immich_install_dir }}/docker-compose.yml"
+    mode: '0640'
+
+- name: Déployer le fichier .env
+  template:
+    src: .env.j2
+    dest: "{{ immich_install_dir }}/.env"
+    mode: '0600'
+  no_log: true
+
+- name: Démarrer Immich avec Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ immich_install_dir }}"
+    state: present
+    pull: always
+
+- name: Attendre qu'Immich soit disponible
+  uri:
+    url: "http://localhost:{{ immich_port }}/api/server-info/ping"
+    status_code: 200
+  register: result
+  until: result.status == 200
+  retries: 30
+  delay: 10
+
+- name: Créer le LaunchAgent pour démarrage automatique
+  template:
+    src: com.immich.plist.j2
+    dest: "{{ ansible_env.HOME }}/Library/LaunchAgents/com.immich.plist"
+    mode: '0644'
+
+- name: Charger le LaunchAgent
+  command: launchctl load "{{ ansible_env.HOME }}/Library/LaunchAgents/com.immich.plist"
+  changed_when: false

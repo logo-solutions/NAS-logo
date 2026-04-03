@@ -1,0 +1,78 @@
+---
+# roles/acces/tasks/main.yml
+
+- name: Attendre qu'Immich soit disponible
+  uri:
+    url: "http://localhost:{{ immich_port }}/api/server-info/ping"
+    status_code: 200
+  register: ping
+  until: ping.status == 200
+  retries: 20
+  delay: 10
+
+- name: Créer le compte administrateur Immich
+  uri:
+    url: "http://localhost:{{ immich_port }}/api/auth/admin-sign-up"
+    method: POST
+    body_format: json
+    body:
+      email: "{{ vault_immich_admin_email }}"
+      password: "{{ vault_immich_admin_password }}"
+      name: "Administrateur"
+    status_code: [201, 400]
+  no_log: true
+  register: admin_signup
+  changed_when: admin_signup.status == 201
+
+- name: Afficher le résultat de création admin
+  debug:
+    msg: >
+      {{ 'Compte admin créé' if admin_signup.status == 201
+         else 'Compte admin déjà existant' }}
+
+- name: Obtenir un token admin
+  uri:
+    url: "http://localhost:{{ immich_port }}/api/auth/login"
+    method: POST
+    body_format: json
+    body:
+      email: "{{ vault_immich_admin_email }}"
+      password: "{{ vault_immich_admin_password }}"
+    status_code: 201
+  register: admin_token
+  no_log: true
+
+- name: Configurer la politique de session (expiration 30 jours)
+  uri:
+    url: "http://localhost:{{ immich_port }}/api/system-config"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ admin_token.json.accessToken }}"
+    body_format: json
+    body:
+      passwordLogin:
+        enabled: true
+    status_code: 200
+  no_log: true
+
+- name: Déployer le script de création d'utilisateurs
+  template:
+    src: create_users.sh.j2
+    dest: "{{ ansible_env.HOME }}/immich/scripts/create_users.sh"
+    mode: '0700'
+  no_log: true
+
+- name: Déployer la liste des utilisateurs (à remplir)
+  copy:
+    dest: "{{ ansible_env.HOME }}/immich/config/users.yml"
+    mode: '0600'
+    content: |
+      # Liste des utilisateurs à créer dans Immich
+      # Exécuter create_users.sh après avoir rempli ce fichier
+      #
+      # users:
+      #   - name: "Prénom Nom"
+      #     email: "prenom@exemple.com"
+      #     password: "mot-de-passe-fort"
+      #     quota_gb: 100
+      #     role: user   # ou admin

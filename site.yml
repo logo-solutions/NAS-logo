@@ -1,0 +1,26 @@
+---
+# site.yml — Playbook principal
+# Usage standard :
+#   ansible-playbook site.yml --ask-vault-pass
+#
+# Avec chemin SSD personnalisé :
+#   ansible-playbook site.yml --ask-vault-pass -e ssd_mount_point=/Volumes/MonSSD
+
+- name: Provisioning complet Mac Mini Immich
+  hosts: local
+  connection: local
+  become: false
+
+  vars_files:
+    - inventory/group_vars/all.yml
+    - inventory/group_vars/vault.yml
+
+  roles:
+    - role: base          # Homebrew, outils système, SSH
+    - role: securite      # Tailscale VPN, Caddy, FileVault
+    - role: stockage      # Montage SSD, formatage, SMART
+    - role: docker        # Installation et config Docker
+    - role: immich        # Déploiement Immich via Docker Compose
+    - role: acces         # Utilisateurs, 2FA, tokens
+    - role: sauvegarde    # rclone, cron, politique de rétention
+    - role: monitoring    # Health checks, alertes ntfy.sh

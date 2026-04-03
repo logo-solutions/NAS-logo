@@ -1,0 +1,52 @@
+#!/bin/bash
+# roles/acces/templates/create_users.sh.j2
+# Crée les utilisateurs Immich définis dans users.yml
+
+set -euo pipefail
+
+BASE_URL="http://localhost:{{ immich_port }}/api"
+
+# Authentification admin
+TOKEN=$(curl -sf -X POST "$BASE_URL/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"{{ vault_immich_admin_email }}","password":"{{ vault_immich_admin_password }}"}' \
+  | jq -r '.accessToken')
+
+if [ -z "$TOKEN" ]; then
+  echo "Erreur : impossible d'obtenir le token admin"
+  exit 1
+fi
+
+echo "Connecté en tant qu'admin."
+
+# Créer un utilisateur
+create_user() {
+  local NAME=$1
+  local EMAIL=$2
+  local PASSWORD=$3
+  local QUOTA_GB=${4:-50}
+
+  RESULT=$(curl -sf -X POST "$BASE_URL/user" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"name\": \"$NAME\",
+      \"email\": \"$EMAIL\",
+      \"password\": \"$PASSWORD\",
+      \"storageLabel\": \"$EMAIL\",
+      \"quotaSizeInBytes\": $(( QUOTA_GB * 1024 * 1024 * 1024 ))
+    }" 2>/dev/null || echo '{"error":"exists"}')
+
+  if echo "$RESULT" | grep -q '"error"'; then
+    echo "  Utilisateur $EMAIL déjà existant ou erreur — ignoré."
+  else
+    echo "  Utilisateur $EMAIL créé avec succès (quota : ${QUOTA_GB}Go)."
+  fi
+}
+
+# Exemple d'appel — adapter selon vos besoins :
+# create_user "Alice Martin"  "alice@exemple.com"  "mot-de-passe-fort" 100
+# create_user "Bob Dupont"    "bob@exemple.com"    "mot-de-passe-fort" 50
+
+echo "Usage : décommentez les lignes create_user() ci-dessus et relancez."
+echo "Script situé dans : {{ ansible_env.HOME }}/immich/scripts/create_users.sh"

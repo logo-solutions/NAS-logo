@@ -1,0 +1,45 @@
+#!/bin/bash
+# roles/sauvegarde/templates/backup.sh.j2
+# Sauvegarde Immich → Hetzner Storage Box via rclone
+
+set -euo pipefail
+
+DATE=$(date +%Y-%m-%d)
+LOG_PREFIX="[$(date '+%Y-%m-%d %H:%M:%S')]"
+
+echo "$LOG_PREFIX Démarrage sauvegarde..."
+
+# Sauvegarde des fichiers Immich
+rclone sync \
+  {{ immich_data_dir }} \
+  hetzner:{{ hetzner_remote_path }}/daily/${DATE} \
+  --checksum \
+  --log-level INFO \
+  --transfers 4
+
+# Rotation — garder {{ backup_daily_keep }} jours
+find {{ hetzner_backup_dir }}/daily -maxdepth 1 -type d -mtime +{{ backup_daily_keep }} -exec rm -rf {} +
+
+# Sauvegarde hebdomadaire (chaque lundi)
+if [ "$(date +%u)" = "1" ]; then
+  WEEK=$(date +%Y-W%V)
+  rclone copy \
+    {{ immich_data_dir }} \
+    hetzner:{{ hetzner_remote_path }}/weekly/${WEEK} \
+    --checksum
+fi
+
+# Sauvegarde mensuelle (1er du mois)
+if [ "$(date +%d)" = "01" ]; then
+  MONTH=$(date +%Y-%m)
+  rclone copy \
+    {{ immich_data_dir }} \
+    hetzner:{{ hetzner_remote_path }}/monthly/${MONTH} \
+    --checksum
+fi
+
+# Notification de succès
+curl -s -d "$LOG_PREFIX Sauvegarde terminée avec succès" \
+  "https://ntfy.sh/{{ ntfy_topic }}" || true
+
+echo "$LOG_PREFIX Sauvegarde terminée."

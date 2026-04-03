@@ -1,0 +1,30 @@
+#!/bin/bash
+# roles/monitoring/templates/healthcheck.sh.j2
+
+set -euo pipefail
+
+IMMICH_URL="http://localhost:{{ immich_port }}/api/server-info/ping"
+NTFY_URL="https://ntfy.sh/{{ ntfy_topic }}"
+
+# Vérifier Immich
+if ! curl -sf "$IMMICH_URL" > /dev/null; then
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Immich ne répond pas — tentative de redémarrage..."
+  cd {{ immich_install_dir }} && docker compose restart immich-server
+  curl -s -d "Immich était down — redémarrage automatique effectué" "$NTFY_URL" || true
+else
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Immich OK"
+fi
+
+# Vérifier les conteneurs Docker
+for container in immich_server immich_postgres immich_redis; do
+  STATUS=$(docker inspect --format='{{"{{"}}{{.State.Status}}{{"}}"}}' $container 2>/dev/null || echo "absent")
+  if [ "$STATUS" != "running" ]; then
+    curl -s -d "Conteneur $container en état : $STATUS" "$NTFY_URL" || true
+  fi
+done
+
+# Vérifier l'espace disque
+USAGE=$(df "{{ ssd_mount_point }}" | awk 'NR==2 {print $5}' | tr -d '%')
+if [ "$USAGE" -ge {{ alert_disk_threshold }} ]; then
+  curl -s -d "SSD Immich à ${USAGE}% de capacité !" "$NTFY_URL" || true
+fi

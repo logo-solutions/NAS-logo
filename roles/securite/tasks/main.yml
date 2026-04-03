@@ -1,0 +1,65 @@
+---
+# roles/securite/tasks/main.yml
+
+- name: Vérifier si Tailscale est installé
+  stat:
+    path: /Applications/Tailscale.app
+  register: tailscale_app
+
+- name: Connecter Tailscale au réseau
+  command: tailscale up --authkey={{ tailscale_authkey }} --accept-routes
+  when: tailscale_app.stat.exists
+  no_log: true
+  changed_when: false
+
+- name: Vérifier l'état de Tailscale
+  command: tailscale status
+  register: tailscale_status
+  changed_when: false
+
+- name: Afficher l'état Tailscale
+  debug:
+    msg: "{{ tailscale_status.stdout_lines[0] }}"
+
+- name: Créer le répertoire de config Caddy
+  file:
+    path: "{{ ansible_env.HOME }}/.config/caddy"
+    state: directory
+    mode: '0750'
+
+- name: Déployer le Caddyfile
+  template:
+    src: Caddyfile.j2
+    dest: "{{ ansible_env.HOME }}/.config/caddy/Caddyfile"
+    mode: '0640'
+  notify: Recharger Caddy
+
+- name: Démarrer Caddy en tant que service
+  command: brew services start caddy
+  changed_when: false
+
+- name: Vérifier si FileVault est activé
+  command: fdesetup status
+  register: filevault_status
+  changed_when: false
+
+- name: Afficher le statut FileVault
+  debug:
+    msg: "{{ filevault_status.stdout }}"
+
+- name: Avertir si FileVault est désactivé
+  debug:
+    msg: >
+      ATTENTION : FileVault n'est pas activé.
+      Activez-le manuellement via Préférences Système → Confidentialité et sécurité → FileVault.
+  when: "'FileVault is Off' in filevault_status.stdout"
+
+- name: Configurer le pare-feu applicatif macOS
+  command: /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on
+  become: true
+  changed_when: false
+
+- name: Bloquer les connexions entrantes non autorisées
+  command: /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on
+  become: true
+  changed_when: false

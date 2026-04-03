@@ -1,0 +1,49 @@
+---
+# roles/stockage/tasks/main.yml
+
+- name: Vérifier que le SSD est branché et visible
+  stat:
+    path: "{{ ssd_mount_point }}"
+  register: ssd_stat
+  failed_when: not ssd_stat.stat.exists
+
+- name: Créer les répertoires de données Immich sur le SSD
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0750'
+  loop:
+    - "{{ immich_data_dir }}"
+    - "{{ immich_db_dir }}"
+    - "{{ hetzner_backup_dir }}"
+    - "{{ hetzner_backup_dir }}/daily"
+    - "{{ hetzner_backup_dir }}/db"
+
+- name: Créer le répertoire des scripts
+  file:
+    path: "{{ ansible_env.HOME }}/immich/scripts"
+    state: directory
+    mode: '0750'
+
+- name: Vérifier la santé SMART du SSD
+  command: "smartctl -H {{ ssd_mount_point }}"
+  register: smart_check
+  changed_when: false
+  failed_when: "'PASSED' not in smart_check.stdout"
+  ignore_errors: true
+
+- name: Afficher le résultat SMART
+  debug:
+    msg: "SMART : {{ smart_check.stdout_lines | last }}"
+
+- name: Créer le script de vérification d'espace disque
+  copy:
+    dest: "{{ ansible_env.HOME }}/immich/scripts/check_disk.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      USAGE=$(df "{{ ssd_mount_point }}" | awk 'NR==2 {print $5}' | tr -d '%')
+      if [ "$USAGE" -ge {{ alert_disk_threshold }} ]; then
+        curl -s -d "Disque SSD Immich a ${USAGE}% - verifier !" \
+          "https://ntfy.sh/{{ ntfy_topic }}"
+      fif
