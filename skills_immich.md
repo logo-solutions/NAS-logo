@@ -1,6 +1,6 @@
-# Skills — Projet stockage sécurisé Immich
+# Domaines de responsabilité — Projet NAS-logo
 
-> Mac Mini 4To · SSD externe · Hetzner Storage Box · Docker · Ansible · Claude Code + MCP
+> Mac Mini · SSD externe `/Volumes/logousb/SSD/NAS-LOGO-VOLUME` · Hetzner Storage Box · Docker · Ansible · Claude Code + MCP
 
 ---
 
@@ -8,13 +8,13 @@
 
 > Protéger l'accès et les données contre toute intrusion
 
-| Responsabilité                | Description                                                         |
-| ----------------------------- | ------------------------------------------------------------------- |
-| VPN (Tailscale)               | Accès équipe uniquement via VPN — Immich jamais exposé sur internet |
-| HTTPS + reverse proxy (Caddy) | Chiffrement TLS, certificat auto-renouvelé, port 443 uniquement     |
-| Chiffrement du disque         | SSD chiffré (FileVault ou LUKS), données illisibles si vol physique |
-| Logs et audit                 | Journalisation des accès, détection de tentatives suspectes         |
-| Mises à jour de sécurité      | Patches macOS, Docker et Immich appliqués régulièrement             |
+| Responsabilité                | Description                                                         | Rôle Ansible  |
+| ----------------------------- | ------------------------------------------------------------------- | ------------- |
+| VPN (Tailscale)               | Accès équipe uniquement via VPN — Immich jamais exposé sur internet | `securite`    |
+| HTTPS + reverse proxy (Caddy) | Chiffrement TLS, certificat auto-renouvelé, port 443 uniquement     | `securite`    |
+| Chiffrement du disque         | SSD chiffré (FileVault), données illisibles si vol physique         | manuel        |
+| Logs et audit                 | Journalisation des accès, détection de tentatives suspectes         | `monitoring`  |
+| Mises à jour de sécurité      | Patches macOS, Docker et Immich appliqués régulièrement             | `base`        |
 
 ---
 
@@ -22,14 +22,14 @@
 
 > Vérifier que tout fonctionne, avant et après chaque changement
 
-| Responsabilité          | Description                                                              |
-| ----------------------- | ------------------------------------------------------------------------ |
-| Tests fonctionnels      | Upload, téléchargement, partage, accès par rôle                          |
-| Tests de restauration   | Simuler une perte de données et valider la restauration complète         |
-| Tests de charge         | Accès simultanés, upload massif, temps de réponse                        |
-| Tests de non-régression | Vérifier qu'une mise à jour ne casse pas l'existant                      |
-| Tests de disponibilité  | Redémarrage Mac Mini, reprise automatique de Docker                      |
-| Test de déchiffrement   | Monter le disque chiffré, déchiffrer et vérifier l'intégrité des données |
+| Responsabilité          | Description                                                              | Commande          |
+| ----------------------- | ------------------------------------------------------------------------ | ----------------- |
+| Tests fonctionnels      | Upload, téléchargement, partage, accès par rôle                          | manuel            |
+| Tests de restauration   | Simuler une perte de données et valider la restauration complète         | `make health`     |
+| Tests de charge         | Accès simultanés, upload massif, temps de réponse                        | manuel            |
+| Tests de non-régression | Vérifier qu'une mise à jour ne casse pas l'existant                      | `make test`       |
+| Tests de disponibilité  | Redémarrage Mac Mini, reprise automatique de Docker                      | `make health`     |
+| Dry-run Ansible         | Vérifier les changements avant application                               | `make dryrun`     |
 
 ---
 
@@ -37,14 +37,14 @@
 
 > Installer, configurer et maintenir Immich pour l'équipe
 
-| Responsabilité        | Description                                    |
-| --------------------- | ---------------------------------------------- |
-| Installation Immich   | Docker Compose, configuration initiale         |
-| Config stockage       | SSD monté, chemin de stockage Immich           |
-| Mises à jour          | Versions, rollback, zero-downtime              |
-| Démarrage automatique | Reprise automatique au redémarrage du Mac Mini |
-| Interface web         | URL, langue, thème pour l'équipe               |
-| Sync mobile           | App iOS/Android, upload automatique            |
+| Responsabilité        | Description                                         | Rôle Ansible |
+| --------------------- | --------------------------------------------------- | ------------ |
+| Installation Immich   | Docker Compose, configuration initiale              | `immich`     |
+| Config stockage       | SSD monté, chemin de stockage Immich                | `stockage`   |
+| Mises à jour          | Versions (`v1.106.4`), rollback, zero-downtime      | `immich`     |
+| Démarrage automatique | LaunchAgent plist, reprise au redémarrage Mac Mini  | `immich`     |
+| Interface web         | Port 2283, domaine Tailscale via Caddy              | `securite`   |
+| Sync mobile           | App iOS/Android, upload automatique                 | manuel       |
 
 ---
 
@@ -52,13 +52,13 @@
 
 > Contrôler qui accède à quoi, et révoquer rapidement si nécessaire
 
-| Responsabilité       | Description                                   |
-| -------------------- | --------------------------------------------- |
-| Utilisateurs         | Création, désactivation, quotas par compte    |
-| Rôles et permissions | Admin, lecteur, éditeur                       |
-| Double auth (2FA)    | TOTP obligatoire pour tous les membres        |
-| Tokens et sessions   | Expiration, révocation, audit des connexions  |
-| Partage albums       | Liens temporaires, accès limité dans le temps |
+| Responsabilité       | Description                                   | Rôle Ansible |
+| -------------------- | --------------------------------------------- | ------------ |
+| Utilisateurs         | Création, désactivation, quotas par compte    | `acces`      |
+| Rôles et permissions | Admin, lecteur, éditeur                       | `acces`      |
+| Double auth (2FA)    | TOTP obligatoire pour tous les membres        | `acces`      |
+| Tokens et sessions   | Expiration, révocation, audit des connexions  | `acces`      |
+| Partage albums       | Liens temporaires, accès limité dans le temps | manuel       |
 
 ---
 
@@ -66,13 +66,13 @@
 
 > Ne jamais perdre une donnée, et pouvoir restaurer à tout moment
 
-| Responsabilité         | Description                                       |
-| ---------------------- | ------------------------------------------------- |
-| Sync Hetzner           | rclone chiffré, synchronisation planifiée         |
-| Backup base de données | PostgreSQL dump automatique avec rotation         |
-| Rétention              | 7j quotidien · 4 semaines hebdo · 12 mois mensuel |
-| Vérification intégrité | Checksum automatique, alerte si échec             |
-| Test de restauration   | Drill mensuel, validation complète des données    |
+| Responsabilité         | Description                                       | Rôle Ansible  |
+| ---------------------- | ------------------------------------------------- | ------------- |
+| Sync Hetzner           | rclone chiffré, synchronisation planifiée         | `sauvegarde`  |
+| Backup base de données | PostgreSQL dump automatique avec rotation         | `sauvegarde`  |
+| Rétention              | 7j quotidien · 4 semaines hebdo · 12 mois mensuel| `sauvegarde`  |
+| Vérification intégrité | Checksum automatique, alerte si échec             | `monitoring`  |
+| Test de restauration   | Drill mensuel, validation complète des données    | manuel        |
 
 ---
 
@@ -80,13 +80,13 @@
 
 > Savoir que tout fonctionne, avant que l'équipe le signale
 
-| Responsabilité    | Description                                    |
-| ----------------- | ---------------------------------------------- |
-| Espace disque     | Seuil d'alerte à 80%, surveillance SMART       |
-| Uptime Immich     | Health check automatique, redémarrage si tombé |
-| Alertes           | Notifications email, Slack ou ntfy.sh          |
-| CPU et RAM        | Charge Mac Mini et conteneurs Docker           |
-| Suivi sauvegardes | Rapport quotidien, logs rclone                 |
+| Responsabilité    | Description                                     | Rôle Ansible  |
+| ----------------- | ----------------------------------------------- | ------------- |
+| Espace disque     | Seuil d'alerte à 80%, surveillance SMART        | `monitoring`  |
+| Uptime Immich     | Health check automatique, redémarrage si tombé  | `monitoring`  |
+| Alertes           | Notifications ntfy.sh (`immich-alerts-*`)       | `monitoring`  |
+| CPU et RAM        | Charge Mac Mini et conteneurs Docker            | `monitoring`  |
+| Suivi sauvegardes | Rapport quotidien, logs rclone                  | `sauvegarde`  |
 
 ---
 
@@ -94,13 +94,15 @@
 
 > Automatiser tout ce qui peut l'être, de façon reproductible
 
-| Responsabilité        | Description                                               |
-| --------------------- | --------------------------------------------------------- |
-| Playbooks Ansible     | Rôles, inventaire, variables d'environnement              |
-| Secrets Ansible Vault | Clés API et mots de passe chiffrés                        |
-| Déploiement continu   | Zero-downtime, rollback automatique                       |
-| Provisioning          | Installation Homebrew, Docker et dépendances from scratch |
-| Tests et lint         | ansible-lint, dry-run, versionnement Git                  |
+| Responsabilité        | Description                                               | Commande        |
+| --------------------- | --------------------------------------------------------- | --------------- |
+| Bootstrap             | Homebrew, Docker, SSH, dépendances                        | `make bootstrap`|
+| Preflight             | Vérification SSD, Hetzner, macOS avant install            | `make preflight`|
+| Dry-run               | Simulation avec diff des changements                      | `make dryrun`   |
+| Installation          | Déploiement complet idempotent                            | `make install`  |
+| Claude Code + MCP     | Connecteurs filesystem, docker, github, shell             | `make claude`   |
+| Secrets Ansible Vault | Clés API et mots de passe chiffrés                        | `vault.yml`     |
+| Tests et lint         | ansible-lint, Molecule sur rôles critiques                | `make lint/test`|
 
 ---
 
@@ -108,27 +110,28 @@
 
 > Gérer le disque physique de façon fiable et durable
 
-| Responsabilité      | Description                                    |
-| ------------------- | ---------------------------------------------- |
-| Partitionnement SSD | Format, montage automatique au démarrage       |
-| Quotas utilisateurs | Limites de stockage par compte Immich          |
-| Santé disque SMART  | Température, secteurs défectueux, durée de vie |
+| Responsabilité      | Description                                    | Rôle Ansible |
+| ------------------- | ---------------------------------------------- | ------------ |
+| Partitionnement SSD | Format, montage `/Volumes/logousb/SSD/NAS-LOGO-VOLUME` | `stockage` |
+| Quotas utilisateurs | Limites de stockage par compte Immich          | `acces`      |
+| Santé disque SMART  | Température, secteurs défectueux, durée de vie | `monitoring` |
 
 ---
 
 ## Récapitulatif
 
-| #   | Skill             | Catégorie | Responsabilités |
-| --- | ----------------- | --------- | --------------- |
-| 1   | Sécurité          | Core      | 5               |
-| 2   | Tests             | Core      | 6               |
-| 3   | Produit           | Core      | 6               |
-| 4   | Gestion des accès | Core      | 5               |
-| 5   | Sauvegarde        | Infra     | 5               |
-| 6   | Monitoring        | Infra     | 5               |
-| 7   | Déploiement       | Infra     | 5               |
-| 8   | Stockage          | Infra     | 3               |
+| #   | Skill             | Catégorie | Rôle Ansible              | Responsabilités |
+| --- | ----------------- | --------- | ------------------------- | --------------- |
+| 1   | Sécurité          | Core      | `securite`                | 5               |
+| 2   | Tests             | Core      | `qualite` + make          | 6               |
+| 3   | Produit           | Core      | `immich`                  | 6               |
+| 4   | Gestion des accès | Core      | `acces`                   | 5               |
+| 5   | Sauvegarde        | Infra     | `sauvegarde`              | 5               |
+| 6   | Monitoring        | Infra     | `monitoring`              | 5               |
+| 7   | Déploiement       | Infra     | Makefile + playbooks      | 7               |
+| 8   | Stockage          | Infra     | `stockage`                | 3               |
 
 ---
 
-_Généré dans le cadre du projet Immich · Mac Mini · Hetzner · Claude Code + MCP_
+_Projet NAS-logo · Mac Mini · Hetzner · Docker · Ansible · Claude Code + MCP_
+_Mis à jour : 2026-04-04_
