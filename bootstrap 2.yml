@@ -1,0 +1,81 @@
+---
+# bootstrap.yml
+# Étape 1 — Prépare l'environnement Ansible sur le MacBook Air
+# Usage : make bootstrap  ou  ansible-playbook bootstrap.yml
+#
+# Ne touche pas encore au Mac Mini.
+# Vérifie que tous les outils sont prêts côté contrôleur.
+
+- name: Bootstrap environnement Ansible
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  tasks:
+
+    - name: Vérifier la version de Python
+      command: python3 --version
+      register: python_version
+      changed_when: false
+
+    - name: Afficher la version Python
+      debug:
+        msg: "Python : {{ python_version.stdout }}"
+
+    - name: Installer ansible-lint
+      pip:
+        name: ansible-lint
+        state: present
+        executable: pip3
+
+    - name: Installer Molecule et driver Docker
+      pip:
+        name:
+          - molecule
+          - molecule-docker
+        state: present
+        executable: pip3
+
+    - name: Installer la collection community.docker
+      command: ansible-galaxy collection install community.docker --force
+      changed_when: false
+
+    - name: Installer la collection community.general
+      command: ansible-galaxy collection install community.general --force
+      changed_when: false
+
+    - name: Vérifier que Docker tourne
+      command: docker info
+      register: docker_check
+      changed_when: false
+      failed_when: docker_check.rc != 0
+
+    - name: Vérifier que la clé SSH existe
+      stat:
+        path: "{{ ansible_env.HOME }}/.ssh/id_ed25519"
+      register: ssh_key
+      failed_when: not ssh_key.stat.exists
+
+    - name: Tester la connexion SSH vers le Mac Mini
+      command: >
+        ssh -o ConnectTimeout=5 -o BatchMode=yes
+        logo@100.113.214.55 echo ok
+      register: ssh_test
+      changed_when: false
+      failed_when: ssh_test.rc != 0
+
+    - name: Tester le ping Ansible vers le Mac Mini
+      command: ansible macmini -i inventory/hosts -m ping
+      register: ansible_ping
+      changed_when: false
+      failed_when: ansible_ping.rc != 0
+
+    - name: Lancer ansible-lint sur le projet
+      command: ansible-lint site.yml
+      register: lint_result
+      changed_when: false
+      failed_when: lint_result.rc != 0
+
+    - name: Bootstrap terminé
+      debug:
+        msg: "Environnement prêt. Prochaine étape : make preflight"

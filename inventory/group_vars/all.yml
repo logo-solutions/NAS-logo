@@ -5,7 +5,7 @@
 mac_user: "{{ ansible_user_id }}"
 
 # Chemin du SSD externe
-ssd_mount_point: "/Volumes/ImmichData"
+ssd_mount_point: "/Volumes/logousb/SSD/NAS-LOGO-VOLUME"
 
 # Immich
 immich_version: "v1.106.4"

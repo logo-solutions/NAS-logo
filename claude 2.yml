@@ -1,0 +1,93 @@
+---
+# claude.yml — Étape 4 (optionnelle)
+# Installe Claude Code + connecteurs MCP sur le Mac Mini
+# Usage : make claude
+
+- name: "Étape 4 — Environnement Claude Code + MCP (optionnel)"
+  hosts: macmini
+  gather_facts: true
+
+  vars_files:
+    - inventory/group_vars/vault.yml
+
+  tasks:
+
+    # --- Claude Code ---
+    - name: Installer Claude Code
+      shell: curl -fsSL https://claude.ai/install.sh | sh
+      args:
+        creates: /usr/local/bin/claude
+      register: claude_install
+
+    - name: Vérifier la version de Claude Code
+      command: claude --version
+      register: claude_version
+      changed_when: false
+
+    - name: Afficher la version Claude Code
+      debug:
+        msg: "Claude Code : {{ claude_version.stdout | trim }}"
+
+    # --- MCP Filesystem ---
+    - name: Ajouter le connecteur MCP filesystem
+      command: >
+        claude mcp add filesystem --
+        npx -y @modelcontextprotocol/server-filesystem
+        {{ ssd_mount_point }}
+        {{ ansible_env.HOME }}/immich
+      changed_when: false
+      environment:
+        PATH: "/opt/homebrew/bin:/usr/local/bin:{{ ansible_env.PATH }}"
+
+    # --- MCP Docker ---
+    - name: Ajouter le connecteur MCP Docker
+      command: >
+        claude mcp add docker --
+        docker run -i --rm
+        -v /var/run/docker.sock:/var/run/docker.sock
+        mcp/docker
+      changed_when: false
+      environment:
+        PATH: "/opt/homebrew/bin:/usr/local/bin:{{ ansible_env.PATH }}"
+
+    # --- MCP GitHub ---
+    - name: Ajouter le connecteur MCP GitHub
+      command: >
+        claude mcp add github
+        -e GITHUB_TOKEN={{ vault_github_token }}
+        -- docker run -i --rm
+        -e GITHUB_TOKEN
+        ghcr.io/github/github-mcp-server
+      changed_when: false
+      no_log: true
+      environment:
+        PATH: "/opt/homebrew/bin:/usr/local/bin:{{ ansible_env.PATH }}"
+
+    # --- MCP Shell (Ansible) ---
+    - name: Ajouter le connecteur MCP Shell
+      command: >
+        claude mcp add shell --
+        npx -y @wonderwhy-er/desktop-commander
+      changed_when: false
+      environment:
+        PATH: "/opt/homebrew/bin:/usr/local/bin:{{ ansible_env.PATH }}"
+
+    # --- Vérification ---
+    - name: Lister les connecteurs MCP installés
+      command: claude mcp list
+      register: mcp_list
+      changed_when: false
+      environment:
+        PATH: "/opt/homebrew/bin:/usr/local/bin:{{ ansible_env.PATH }}"
+
+    - name: Afficher les connecteurs MCP
+      debug:
+        msg: "{{ mcp_list.stdout_lines }}"
+
+    - name: Résumé environnement Claude
+      debug:
+        msg:
+          - "Claude Code installé : {{ claude_version.stdout | trim }}"
+          - "Connecteurs MCP      : filesystem · docker · github · shell"
+          - ""
+          - "Tester avec : claude /mcp"

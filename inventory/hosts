@@ -1,9 +1,5 @@
-[local]
+[all]
 localhost ansible_connection=local ansible_python_interpreter=/usr/bin/python3
 
 [macmini]
-macmini ansible_host=100.113.214.55 ansible_user=logo
-
-[macmini:vars]
-ansible_connection=ssh
-ansible_python_interpreter=/usr/bin/python3
+localhost

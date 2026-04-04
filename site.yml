@@ -1,26 +1,69 @@
 ---
-# site.yml — Playbook principal
-# Usage standard :
-#   ansible-playbook site.yml --ask-vault-pass
-#
-# Avec chemin SSD personnalisé :
-#   ansible-playbook site.yml --ask-vault-pass -e ssd_mount_point=/Volumes/MonSSD
+# site.yml — Étape 3
+# Installation complète avec validation après chaque rôle
+# Usage : make install
 
-- name: Provisioning complet Mac Mini Immich
-  hosts: local
-  connection: local
-  become: false
+- name: "Étape 3 — Installation Immich (Mac Mini)"
+  hosts: macmini
+  gather_facts: true
 
   vars_files:
-    - inventory/group_vars/all.yml
     - inventory/group_vars/vault.yml
 
+  pre_tasks:
+    - name: Rappel — lancer preflight avant install
+      debug:
+        msg: "Si ce n'est pas fait : make preflight && make dryrun"
+
   roles:
-    - role: base          # Homebrew, outils système, SSH
-    - role: securite      # Tailscale VPN, Caddy, FileVault
-    - role: stockage      # Montage SSD, formatage, SMART
-    - role: docker        # Installation et config Docker
-    - role: immich        # Déploiement Immich via Docker Compose
-    - role: acces         # Utilisateurs, 2FA, tokens
-    - role: sauvegarde    # rclone, cron, politique de rétention
-    - role: monitoring    # Health checks, alertes ntfy.sh
+    - role: base
+      tags: [base]
+    - role: qualite
+      tags: [qualite]
+    - role: securite
+      tags: [securite]
+    - role: stockage
+      tags: [stockage]
+    - role: docker
+      tags: [docker]
+    - role: immich
+      tags: [immich]
+    - role: acces
+      tags: [acces]
+    - role: sauvegarde
+      tags: [sauvegarde]
+    - role: monitoring
+      tags: [monitoring]
+
+  post_tasks:
+    - name: Validation — Immich répond
+      uri:
+        url: "http://localhost:{{ immich_port }}/api/server-info/ping"
+        status_code: 200
+      register: ping
+      until: ping.status == 200
+      retries: 10
+      delay: 10
+
+    - name: Validation — Docker tourne
+      command: docker ps
+      changed_when: false
+
+    - name: Validation — SSD monté
+      stat:
+        path: "{{ ssd_mount_point }}"
+      register: ssd_final
+      failed_when: not ssd_final.stat.exists
+
+    - name: Validation — cron sauvegarde présent
+      command: crontab -l
+      register: crontab_check
+      changed_when: false
+      failed_when: "'backup.sh' not in crontab_check.stdout"
+
+    - name: Installation terminée
+      debug:
+        msg:
+          - "Immich disponible sur : https://{{ caddy_domain }}"
+          - "Health check         : make health"
+          - "Logs                 : ~/immich/logs/"

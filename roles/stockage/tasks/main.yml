@@ -46,4 +46,4 @@
       if [ "$USAGE" -ge {{ alert_disk_threshold }} ]; then
         curl -s -d "Disque SSD Immich a ${USAGE}% - verifier !" \
           "https://ntfy.sh/{{ ntfy_topic }}"
-      fif
+      fi

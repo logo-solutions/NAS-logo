@@ -1,0 +1,103 @@
+---
+# preflight.yml
+# Étape 2 — Vérifie les prérequis sur le Mac Mini et fait un dry-run
+# Usage : make preflight  ou  ansible-playbook preflight.yml --ask-vault-pass
+#
+# Bloque l'installation si quelque chose manque.
+# Affiche un diff complet de ce qu'Ansible va modifier.
+
+- name: "2a — Vérification des prérequis machine"
+  hosts: macmini
+  gather_facts: true
+
+  vars_files:
+    - inventory/group_vars/vault.yml
+
+  tasks:
+
+    - name: Vérifier la version de macOS
+      command: sw_vers -productVersion
+      register: macos_version
+      changed_when: false
+
+    - name: Afficher la version macOS
+      debug:
+        msg: "macOS : {{ macos_version.stdout }}"
+
+    - name: Vérifier que macOS est >= 13 Ventura
+      assert:
+        that: macos_version.stdout is version('13.0', '>=')
+        fail_msg: >
+          macOS 13 minimum requis.
+          Version actuelle : {{ macos_version.stdout }}
+
+    - name: Vérifier que le SSD est monté
+      stat:
+        path: "{{ ssd_mount_point }}"
+      register: ssd_check
+      failed_when: not ssd_check.stat.exists
+
+    - name: Vérifier l'espace disponible sur le SSD (minimum 100 Go)
+      shell: df -g {{ ssd_mount_point }} | awk 'NR==2 {print $4}'
+      register: ssd_space
+      changed_when: false
+      failed_when: ssd_space.stdout | int < 100
+
+    - name: Afficher l'espace SSD disponible
+      debug:
+        msg: "SSD : {{ ssd_space.stdout }} Go disponibles"
+
+    - name: Vérifier l'accès SFTP à Hetzner Storage Box
+      command: >
+        sftp -o BatchMode=yes -o ConnectTimeout=10
+        {{ hetzner_user }}@{{ hetzner_host }}
+      register: hetzner_check
+      changed_when: false
+      failed_when: hetzner_check.rc != 0
+      no_log: true
+
+    - name: Vérifier que Homebrew est installé
+      stat:
+        path: /opt/homebrew/bin/brew
+      register: brew_check
+      failed_when: not brew_check.stat.exists
+
+    - name: Vérifier les permissions sudo
+      command: sudo -n true
+      register: sudo_check
+      changed_when: false
+      failed_when: sudo_check.rc != 0
+
+    - name: Résumé des prérequis
+      debug:
+        msg:
+          - "macOS    : {{ macos_version.stdout }} OK"
+          - "SSD      : {{ ssd_space.stdout }} Go disponibles OK"
+          - "Hetzner  : accès SFTP OK"
+          - "Homebrew : installé OK"
+          - "Sudo     : permissions OK"
+
+- name: "2b — Dry-run complet avec diff"
+  hosts: macmini
+  gather_facts: true
+  check_mode: true
+  diff: true
+
+  vars_files:
+    - inventory/group_vars/vault.yml
+
+  roles:
+    - role: base
+    - role: qualite
+    - role: securite
+    - role: stockage
+    - role: docker
+    - role: immich
+    - role: acces
+    - role: sauvegarde
+    - role: monitoring
+
+  post_tasks:
+    - name: Dry-run terminé
+      debug:
+        msg: "Dry-run OK. Aucun changement appliqué. Lancez : make install"
