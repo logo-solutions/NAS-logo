@@ -1,15 +1,47 @@
 ---
 # roles/docker — Docker Desktop for Mac
 
-- name: "Installer Docker Desktop via Homebrew Cask"
-  community.general.homebrew_cask:
-    name: docker
-    state: present
+
+- name: "Vérifier si Docker (Colima) est déjà disponible"
+  ansible.builtin.command:
+    cmd: "{{ docker_bin }} info"
+  environment:
+    DOCKER_HOST: "{{ docker_host }}"
+  register: docker_check
+  changed_when: false
+  failed_when: false
   tags: [docker]
 
-- name: "Attendre que Docker Desktop démarre (jusqu'à 120s)"
+- name: "Installer Docker CLI + Colima via Homebrew"
+  community.general.homebrew:
+    name:
+      - docker
+      - colima
+    state: present
+  when: docker_check.rc != 0
+  tags: [docker]
+
+- name: "Démarrer Colima si nécessaire"
   ansible.builtin.command:
-    cmd: docker info
+    cmd: /opt/homebrew/bin/colima start
+  environment:
+    HOME: "/Users/{{ ansible_user_id }}"
+  when: docker_check.rc != 0
+  changed_when: true
+  tags: [docker]
+
+- name: "Supprimer docker-credential-desktop du config Docker (Colima incompatible)"
+  ansible.builtin.lineinfile:
+    path: "/Users/{{ ansible_user_id }}/.docker/config.json"
+    regexp: '"credsStore"\s*:'
+    state: absent
+  tags: [docker]
+
+- name: "Vérifier que Docker (Colima) répond"
+  ansible.builtin.command:
+    cmd: "{{ docker_bin }} info"
+  environment:
+    DOCKER_HOST: "{{ docker_host }}"
   register: docker_info
   retries: 12
   delay: 10

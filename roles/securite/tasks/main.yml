@@ -1,23 +1,12 @@
 ---
 # roles/securite — Tailscale + firewall macOS
 
-- name: "Vérifier si Tailscale est déjà connecté"
+- name: "Vérifier que Tailscale est connecté"
   ansible.builtin.command:
-    cmd: tailscale status --json
-  register: tailscale_current
+    cmd: /usr/local/bin/tailscale status
+  register: tailscale_status
   changed_when: false
-  failed_when: false
-  tags: [securite, tailscale]
-
-- name: "Connecter Tailscale avec authkey"
-  ansible.builtin.command:
-    cmd: tailscale up --authkey={{ vault_tailscale_authkey }} --hostname={{ tailscale_hostname }} --accept-routes
-  no_log: true
-  changed_when: true
-  when: >
-    tailscale_current.rc != 0 or
-    (tailscale_current.stdout | from_json).BackendState != "Running"
-  notify: restart tailscale
+  failed_when: tailscale_status.rc != 0
   tags: [securite, tailscale]
 
 - name: "Activer le firewall macOS (Application Firewall)"

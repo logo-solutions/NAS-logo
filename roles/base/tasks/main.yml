@@ -16,10 +16,3 @@
     name: ansible-lint
     state: present
   tags: [base]
-
-- name: "Installer les collections Ansible requises"
-  ansible.builtin.command:
-    cmd: ansible-galaxy collection install {{ item }} --upgrade
-  loop: "{{ ansible_collections }}"
-  changed_when: false
-  tags: [base]

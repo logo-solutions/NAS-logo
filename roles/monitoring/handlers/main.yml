@@ -4,6 +4,9 @@
     project_src: "{{ ansible_env.HOME }}/monitoring"
     state: present
     recreate: always
+    docker_cli: "{{ docker_bin }}"
+  environment:
+    DOCKER_HOST: "{{ docker_host }}"
 
 - name: reload healthcheck launchagent
   ansible.builtin.command:

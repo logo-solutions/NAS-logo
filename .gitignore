@@ -1,5 +1,8 @@
 .DS_Store
 
+# Fichier mot de passe vault (local uniquement)
+.nas-logo-vault-pass
+
 # Ne jamais committer vault.yml décrypté
 # Chiffrer avec : ansible-vault encrypt inventory/group_vars/vault.yml
 inventory/group_vars/vault.yml

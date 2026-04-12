@@ -39,8 +39,6 @@ backup_monthly_keep: 12
 # Tailscale
 tailscale_hostname: macmini
 
-# Ansible collections requises
-ansible_collections:
-  - community.general
-  - community.docker
-  - ansible.posix
+# Docker (Colima sur Apple Silicon)
+docker_bin: /opt/homebrew/bin/docker
+docker_host: "unix:///Users/{{ ansible_user_id }}/.colima/default/docker.sock"

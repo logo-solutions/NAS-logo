@@ -1,5 +1,7 @@
 INVENTORY := inventory/hosts
-VAULT_ARGS := --ask-vault-pass
+VAULT_PASS_FILE := $(HOME)/.nas-logo-vault-pass
+BECOME_PASS_FILE := $(HOME)/.nas-logo-become-pass
+VAULT_ARGS := --vault-password-file $(VAULT_PASS_FILE) --become-password-file $(BECOME_PASS_FILE)
 
 .PHONY: bootstrap preflight dryrun install health backup lint claude
 

@@ -1,2 +1,2 @@
 [macmini]
-localhost ansible_connection=local
+100.113.214.55 ansible_user=logo

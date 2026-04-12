@@ -30,6 +30,9 @@
     project_src: "{{ immich_install_dir }}"
     state: present
     pull: always
+    docker_cli: "{{ docker_bin }}"
+  environment:
+    DOCKER_HOST: "{{ docker_host }}"
   tags: [immich]
 
 - name: "Attendre qu'Immich soit opérationnel"

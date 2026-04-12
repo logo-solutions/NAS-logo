@@ -34,6 +34,9 @@
     project_src: "{{ ansible_env.HOME }}/monitoring"
     state: present
     pull: always
+    docker_cli: "{{ docker_bin }}"
+  environment:
+    DOCKER_HOST: "{{ docker_host }}"
   tags: [monitoring]
 
 - name: "Attendre que Grafana soit prêt"

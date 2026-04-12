@@ -22,14 +22,6 @@
       failed_when: ssd_free_gb.stdout | int < 20
       tags: [preflight, stockage]
 
-    - name: "Vérifier que Tailscale authkey est configurée"
-      ansible.builtin.assert:
-        that:
-          - vault_tailscale_authkey != "CHANGE_ME"
-          - vault_tailscale_authkey | length > 0
-        fail_msg: "vault_tailscale_authkey non configurée dans vault.yml"
-      tags: [preflight, tailscale]
-
     - name: "Vérifier la joignabilité Hetzner Storage Box"
       ansible.builtin.wait_for:
         host: "{{ vault_hetzner_host }}"
