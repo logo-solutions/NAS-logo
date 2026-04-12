@@ -36,6 +36,58 @@
     pull: always
   tags: [monitoring]
 
+- name: "Attendre que Grafana soit prêt"
+  ansible.builtin.uri:
+    url: "http://localhost:{{ grafana_port }}/api/health"
+    method: GET
+    status_code: 200
+    timeout: 5
+  retries: 12
+  delay: 10
+  register: grafana_health
+  until: grafana_health.status == 200
+  tags: [monitoring, grafana]
+
+- name: "Créer la datasource Prometheus dans Grafana"
+  ansible.builtin.uri:
+    url: "http://localhost:{{ grafana_port }}/api/datasources"
+    method: POST
+    user: admin
+    password: "{{ vault_grafana_admin_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      name: Prometheus
+      type: prometheus
+      url: "http://prometheus:{{ prometheus_port }}"
+      access: proxy
+      isDefault: true
+    status_code: [200, 409]  # 409 = déjà existante
+  tags: [monitoring, grafana]
+
+- name: "Importer les dashboards communautaires Grafana"
+  ansible.builtin.uri:
+    url: "http://localhost:{{ grafana_port }}/api/dashboards/import"
+    method: POST
+    user: admin
+    password: "{{ vault_grafana_admin_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      gnetId: "{{ item }}"
+      overwrite: true
+      inputs:
+        - name: DS_PROMETHEUS
+          type: datasource
+          pluginId: prometheus
+          value: Prometheus
+      folderId: 0
+    status_code: 200
+  loop:
+    - "{{ grafana_dashboard_cadvisor_id }}"
+    - "{{ grafana_dashboard_node_id }}"
+  tags: [monitoring, grafana]
+
 - name: "Déployer le script d'alerte disque ntfy"
   ansible.builtin.template:
     src: healthcheck.sh.j2

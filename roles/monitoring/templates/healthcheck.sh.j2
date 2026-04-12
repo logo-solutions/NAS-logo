@@ -5,7 +5,7 @@ set -euo pipefail
 
 SSD_MOUNT="{{ ssd_mount_point }}"
 THRESHOLD="{{ alert_disk_threshold }}"
-NTFY_URL="http://localhost:{{ ntfy_port }}/{{ vault_ntfy_topic }}"
+NTFY_URL="http://localhost:{{ ntfy_port }}/{{ ntfy_topic }}"
 
 usage=$(df -h "$SSD_MOUNT" 2>/dev/null | awk 'NR==2 {gsub(/%/,"",$5); print $5}')
 

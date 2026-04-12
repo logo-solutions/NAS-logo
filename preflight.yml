@@ -48,9 +48,7 @@
     - name: "Vérifier que les secrets vault ne sont pas des placeholders"
       ansible.builtin.assert:
         that:
-          - vault_immich_db_password != "CHANGE_ME"
           - vault_grafana_admin_password != "CHANGE_ME"
-          - vault_ntfy_topic != "CHANGE_ME"
         fail_msg: "Des secrets vault.yml ont des valeurs placeholder. Complétez-les avant de déployer."
       tags: [preflight, secrets]
 

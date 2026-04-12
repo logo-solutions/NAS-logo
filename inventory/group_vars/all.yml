@@ -14,6 +14,7 @@ immich_db_dir: "{{ ssd_mount_point }}/immich-db"
 immich_port: 2283
 immich_db_name: immich
 immich_db_user: immich
+immich_db_password: "{{ lookup('ansible.builtin.password', ansible_env.HOME + '/.nas-logo-credentials/immich_db_password length=32 chars=ascii_letters,digits') }}"
 
 # Monitoring
 monitoring_data_dir: "{{ ssd_mount_point }}/monitoring"
@@ -21,6 +22,7 @@ grafana_port: 3000
 prometheus_port: 9090
 cadvisor_port: 8080
 ntfy_port: 8090
+ntfy_topic: nas-logo
 alert_disk_threshold: 80
 grafana_dashboard_cadvisor_id: 14282
 grafana_dashboard_node_id: 1860
