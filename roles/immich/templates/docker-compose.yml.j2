@@ -12,13 +12,13 @@ services:
       - /etc/localtime:/etc/localtime:ro
     env_file: .env
     ports:
-      - 127.0.0.1:${IMMICH_PORT}:3001
+      - ${IMMICH_PORT}:2283
     depends_on:
       - redis
       - database
     restart: always
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:3001/api/server-info/ping"]
+      test: ["CMD", "wget", "--spider", "http://localhost:2283/api/server/ping"]
       interval: 30s
       timeout: 10s
       retries: 3
