@@ -68,6 +68,17 @@
     status_code: [200, 409]  # 409 = déjà existante
   tags: [monitoring, grafana]
 
+- name: "Télécharger les dashboards depuis grafana.com"
+  ansible.builtin.uri:
+    url: "https://grafana.com/api/dashboards/{{ item }}/revisions/latest/download"
+    method: GET
+    return_content: true
+  register: grafana_dashboard_json
+  loop:
+    - "{{ grafana_dashboard_cadvisor_id }}"
+    - "{{ grafana_dashboard_node_id }}"
+  tags: [monitoring, grafana]
+
 - name: "Importer les dashboards communautaires Grafana"
   ansible.builtin.uri:
     url: "http://localhost:{{ grafana_port }}/api/dashboards/import"
@@ -77,7 +88,7 @@
     force_basic_auth: true
     body_format: json
     body:
-      gnetId: "{{ item }}"
+      dashboard: "{{ item.content | from_json }}"
       overwrite: true
       inputs:
         - name: DS_PROMETHEUS
@@ -86,9 +97,9 @@
           value: Prometheus
       folderId: 0
     status_code: 200
-  loop:
-    - "{{ grafana_dashboard_cadvisor_id }}"
-    - "{{ grafana_dashboard_node_id }}"
+  loop: "{{ grafana_dashboard_json.results }}"
+  loop_control:
+    label: "dashboard {{ item.item }}"
   tags: [monitoring, grafana]
 
 - name: "Déployer le script d'alerte disque ntfy"
