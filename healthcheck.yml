@@ -1,0 +1,73 @@
+---
+# Health check post-déploiement NAS-logo
+# Usage : make health
+
+- name: Health check NAS-logo
+  hosts: macmini
+  gather_facts: true
+
+  tasks:
+    - name: "Vérifier que le SSD est monté"
+      ansible.builtin.stat:
+        path: "{{ ssd_mount_point }}"
+      register: ssd_stat
+      failed_when: not ssd_stat.stat.exists
+      tags: [health, stockage]
+
+    - name: "Vérifier l'espace disque SSD (alerte si > {{ alert_disk_threshold }}%)"
+      ansible.builtin.shell:
+        cmd: df -h "{{ ssd_mount_point }}" | awk 'NR==2 {gsub(/%/,"",$5); print $5}'
+      register: ssd_usage_pct
+      changed_when: false
+      tags: [health, stockage]
+
+    - name: "Alerte disque SSD"
+      ansible.builtin.debug:
+        msg: "ALERTE : SSD utilisé à {{ ssd_usage_pct.stdout }}% (seuil : {{ alert_disk_threshold }}%)"
+      when: ssd_usage_pct.stdout | int > alert_disk_threshold | int
+      tags: [health, stockage]
+
+    - name: "Vérifier qu'Immich répond (port {{ immich_port }})"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ immich_port }}/api/server-info/ping"
+        method: GET
+        status_code: 200
+        timeout: 10
+      tags: [health, immich]
+
+    - name: "Vérifier que Grafana répond (port {{ grafana_port }})"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ grafana_port }}/api/health"
+        method: GET
+        status_code: 200
+        timeout: 10
+      tags: [health, monitoring]
+
+    - name: "Vérifier que Prometheus répond (port {{ prometheus_port }})"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ prometheus_port }}/-/healthy"
+        method: GET
+        status_code: 200
+        timeout: 10
+      tags: [health, monitoring]
+
+    - name: "Vérifier que ntfy répond (port {{ ntfy_port }})"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ ntfy_port }}/v1/health"
+        method: GET
+        status_code: 200
+        timeout: 10
+      tags: [health, monitoring]
+
+    - name: "Vérifier que Tailscale est connecté"
+      ansible.builtin.command:
+        cmd: tailscale status --json
+      register: tailscale_status
+      changed_when: false
+      failed_when: (tailscale_status.stdout | from_json).BackendState != "Running"
+      tags: [health, tailscale]
+
+    - name: "Health check réussi"
+      ansible.builtin.debug:
+        msg: "Tous les services sont opérationnels."
+      tags: [health]

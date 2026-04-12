@@ -1,0 +1,53 @@
+---
+# roles/monitoring — Prometheus + Grafana + cAdvisor + ntfy
+
+- name: "Créer les répertoires de monitoring"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0750"
+  loop:
+    - "{{ monitoring_data_dir }}/prometheus"
+    - "{{ monitoring_data_dir }}/grafana"
+    - "{{ monitoring_data_dir }}/ntfy"
+    - "{{ ansible_env.HOME }}/monitoring"
+  tags: [monitoring]
+
+- name: "Déployer la configuration Prometheus"
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ monitoring_data_dir }}/prometheus/prometheus.yml"
+    mode: "0640"
+  notify: restart monitoring
+  tags: [monitoring, prometheus]
+
+- name: "Déployer docker-compose.monitoring.yml"
+  ansible.builtin.template:
+    src: docker-compose.monitoring.yml.j2
+    dest: "{{ ansible_env.HOME }}/monitoring/docker-compose.yml"
+    mode: "0640"
+  notify: restart monitoring
+  tags: [monitoring]
+
+- name: "Démarrer la stack monitoring"
+  community.docker.docker_compose_v2:
+    project_src: "{{ ansible_env.HOME }}/monitoring"
+    state: present
+    pull: always
+  tags: [monitoring]
+
+- name: "Déployer le script d'alerte disque ntfy"
+  ansible.builtin.template:
+    src: healthcheck.sh.j2
+    dest: /usr/local/bin/nas-logo-healthcheck.sh
+    mode: "0755"
+  become: true
+  tags: [monitoring]
+
+- name: "Déployer le LaunchAgent pour les alertes disque"
+  ansible.builtin.template:
+    src: com.nas-logo.healthcheck.plist.j2
+    dest: "{{ ansible_env.HOME }}/Library/LaunchAgents/com.nas-logo.healthcheck.plist"
+    mode: "0644"
+  notify: reload healthcheck launchagent
+  tags: [monitoring]

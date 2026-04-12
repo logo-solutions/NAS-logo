@@ -1,0 +1,9 @@
+# NAS-logo SSH hardening
+PasswordAuthentication no
+PermitRootLogin no
+ChallengeResponseAuthentication no
+UsePAM yes
+X11Forwarding no
+PrintMotd no
+AcceptEnv LANG LC_*
+Subsystem sftp /usr/libexec/sftp-server

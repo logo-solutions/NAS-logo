@@ -1,0 +1,22 @@
+---
+# roles/stockage — Vérification du SSD et création de l'arborescence
+
+- name: "Vérifier que le SSD est monté"
+  ansible.builtin.stat:
+    path: "{{ ssd_mount_point }}"
+  register: ssd_stat
+  failed_when: not ssd_stat.stat.exists or not ssd_stat.stat.isdir
+  tags: [stockage]
+
+- name: "Créer l'arborescence des données sur le SSD"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0750"
+  loop:
+    - "{{ immich_data_dir }}"
+    - "{{ immich_db_dir }}"
+    - "{{ monitoring_data_dir }}/prometheus"
+    - "{{ monitoring_data_dir }}/grafana"
+    - "{{ backup_dir }}"
+  tags: [stockage]

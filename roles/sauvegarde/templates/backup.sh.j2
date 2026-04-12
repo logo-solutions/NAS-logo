@@ -1,0 +1,36 @@
+#!/bin/bash
+# backup.sh — dump DB + sync rclone vers Hetzner chiffré
+# Généré par Ansible (NAS-logo)
+set -euo pipefail
+
+NTFY_URL="http://localhost:{{ ntfy_port }}/{{ vault_ntfy_topic }}"
+LOG_FILE="/tmp/nas-logo-backup.log"
+
+notify() {
+  local title="$1" msg="$2" priority="${3:-default}"
+  curl -s -H "Title: $title" -H "Priority: $priority" -d "$msg" "$NTFY_URL" || true
+}
+
+echo "==> Sauvegarde NAS-logo démarrée ($(date))" | tee "$LOG_FILE" >&2
+
+# 1. Dump PostgreSQL
+echo "==> Dump base de données..." | tee -a "$LOG_FILE" >&2
+/usr/local/bin/nas-logo-dump-db.sh 2>&1 | tee -a "$LOG_FILE"
+
+# 2. Sync vers Hetzner chiffré
+echo "==> Sync rclone vers Hetzner..." | tee -a "$LOG_FILE" >&2
+rclone sync "{{ ssd_mount_point }}" hetzner-crypt: \
+  --backup-dir "hetzner-crypt:_versions/$(date +%Y%m%d)" \
+  --log-level INFO \
+  --log-file "$LOG_FILE" \
+  --min-age 5m
+
+# 3. Rétention : purger les anciennes versions
+echo "==> Application de la rétention..." | tee -a "$LOG_FILE" >&2
+rclone delete hetzner-crypt:_versions \
+  --min-age {{ backup_daily_keep }}d \
+  --log-level INFO \
+  --log-file "$LOG_FILE" || true
+
+echo "==> Sauvegarde terminée ($(date))" | tee -a "$LOG_FILE" >&2
+notify "NAS-logo Sauvegarde OK" "Sauvegarde terminée avec succès. Voir $LOG_FILE." "low"

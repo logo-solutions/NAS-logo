@@ -1,0 +1,44 @@
+---
+# Variables globales NAS-logo — pas de secrets ici (voir vault.yml)
+
+mac_user: "{{ ansible_user_id }}"
+
+# SSD externe
+ssd_mount_point: /Volumes/logousb/SSD/NAS-LOGO-VOLUME
+
+# Immich
+immich_version: release
+immich_install_dir: "{{ ansible_env.HOME }}/immich"
+immich_data_dir: "{{ ssd_mount_point }}/immich"
+immich_db_dir: "{{ ssd_mount_point }}/immich-db"
+immich_port: 2283
+immich_db_name: immich
+immich_db_user: immich
+
+# Monitoring
+monitoring_data_dir: "{{ ssd_mount_point }}/monitoring"
+grafana_port: 3000
+prometheus_port: 9090
+cadvisor_port: 8080
+ntfy_port: 8090
+alert_disk_threshold: 80
+grafana_dashboard_cadvisor_id: 14282
+grafana_dashboard_node_id: 1860
+
+# Sauvegarde
+backup_dir: "{{ ssd_mount_point }}/backups"
+hetzner_host: "{{ vault_hetzner_host }}"
+hetzner_user: "{{ vault_hetzner_user }}"
+hetzner_remote_path: /immich-backup
+backup_daily_keep: 7
+backup_weekly_keep: 4
+backup_monthly_keep: 12
+
+# Tailscale
+tailscale_hostname: macmini
+
+# Ansible collections requises
+ansible_collections:
+  - community.general
+  - community.docker
+  - ansible.posix

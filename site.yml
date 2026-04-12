@@ -1,0 +1,24 @@
+---
+# Playbook principal NAS-logo
+# Usage : make install  →  ansible-playbook -i inventory/hosts site.yml --ask-vault-pass
+
+- name: Provisioning NAS-logo
+  hosts: macmini
+  gather_facts: true
+
+  roles:
+    - role: base
+      tags: [base]
+    - role: stockage
+      tags: [stockage]
+    - role: acces
+      tags: [acces]
+    - role: securite
+      tags: [securite, tailscale]
+    - role: docker
+      tags: [docker]
+    - role: immich
+      tags: [immich]
+    - role: monitoring
+      tags: [monitoring, prometheus, grafana]
+    # - role: sauvegarde   # activé en phase 2 (Hetzner Storage Box)

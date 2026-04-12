@@ -1,0 +1,15 @@
+# rclone.conf — généré par Ansible (NAS-logo)
+
+[hetzner]
+type = sftp
+host = {{ vault_hetzner_host }}
+user = {{ vault_hetzner_user }}
+pass = {{ vault_hetzner_password | community.general.bcrypt }}
+port = 23
+
+[hetzner-crypt]
+type = crypt
+remote = hetzner:{{ hetzner_remote_path }}
+filename_encryption = standard
+directory_name_encryption = true
+password = {{ vault_hetzner_password }}

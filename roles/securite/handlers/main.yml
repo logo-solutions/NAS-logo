@@ -1,0 +1,5 @@
+---
+- name: restart tailscale
+  ansible.builtin.command:
+    cmd: brew services restart tailscale
+  changed_when: true

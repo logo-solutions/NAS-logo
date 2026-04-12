@@ -1,1 +1,9 @@
 .DS_Store
+
+# Ne jamais committer vault.yml décrypté
+# Chiffrer avec : ansible-vault encrypt inventory/group_vars/vault.yml
+inventory/group_vars/vault.yml
+
+# Fichiers générés
+*.retry
+*.log

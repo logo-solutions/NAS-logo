@@ -1,0 +1,27 @@
+#!/bin/bash
+# nas-logo-healthcheck.sh — alerte ntfy si disque SSD > {{ alert_disk_threshold }}%
+# Généré par Ansible (NAS-logo)
+set -euo pipefail
+
+SSD_MOUNT="{{ ssd_mount_point }}"
+THRESHOLD="{{ alert_disk_threshold }}"
+NTFY_URL="http://localhost:{{ ntfy_port }}/{{ vault_ntfy_topic }}"
+
+usage=$(df -h "$SSD_MOUNT" 2>/dev/null | awk 'NR==2 {gsub(/%/,"",$5); print $5}')
+
+if [ -z "$usage" ]; then
+  curl -s -H "Title: NAS-logo SSD introuvable" \
+       -H "Priority: high" \
+       -H "Tags: warning" \
+       -d "SSD non monté : $SSD_MOUNT" \
+       "$NTFY_URL" || true
+  exit 0
+fi
+
+if [ "$usage" -ge "$THRESHOLD" ]; then
+  curl -s -H "Title: NAS-logo Disque plein (${usage}%)" \
+       -H "Priority: urgent" \
+       -H "Tags: rotating_light,hard_disk_drive" \
+       -d "SSD utilisé à ${usage}% (seuil ${THRESHOLD}%). Libérez de l'espace." \
+       "$NTFY_URL" || true
+fi

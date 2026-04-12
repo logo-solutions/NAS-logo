@@ -1,0 +1,18 @@
+---
+# roles/docker — Docker Desktop for Mac
+
+- name: "Installer Docker Desktop via Homebrew Cask"
+  community.general.homebrew_cask:
+    name: docker
+    state: present
+  tags: [docker]
+
+- name: "Attendre que Docker Desktop démarre (jusqu'à 120s)"
+  ansible.builtin.command:
+    cmd: docker info
+  register: docker_info
+  retries: 12
+  delay: 10
+  until: docker_info.rc == 0
+  changed_when: false
+  tags: [docker]

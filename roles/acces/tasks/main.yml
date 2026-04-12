@@ -1,0 +1,12 @@
+---
+# roles/acces — SSH hardening
+
+- name: "Configurer SSH (désactiver auth par mot de passe et root login)"
+  ansible.builtin.template:
+    src: sshd_config.j2
+    dest: /etc/ssh/sshd_config.d/nas-logo.conf
+    mode: "0644"
+    validate: sshd -t -f %s
+  notify: reload sshd
+  become: true
+  tags: [acces]

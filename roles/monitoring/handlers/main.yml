@@ -1,0 +1,11 @@
+---
+- name: restart monitoring
+  community.docker.docker_compose_v2:
+    project_src: "{{ ansible_env.HOME }}/monitoring"
+    state: present
+    recreate: always
+
+- name: reload healthcheck launchagent
+  ansible.builtin.command:
+    cmd: launchctl load -w {{ ansible_env.HOME }}/Library/LaunchAgents/com.nas-logo.healthcheck.plist
+  changed_when: true

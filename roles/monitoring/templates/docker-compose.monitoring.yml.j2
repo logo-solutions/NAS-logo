@@ -1,0 +1,64 @@
+# docker-compose monitoring NAS-logo — généré par Ansible
+
+name: monitoring
+
+services:
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    volumes:
+      - {{ monitoring_data_dir }}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - {{ monitoring_data_dir }}/prometheus:/prometheus
+    ports:
+      - 127.0.0.1:{{ prometheus_port }}:9090
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+    restart: always
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    volumes:
+      - {{ monitoring_data_dir }}/grafana:/var/lib/grafana
+    ports:
+      - 127.0.0.1:{{ grafana_port }}:3000
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: {{ vault_grafana_admin_password }}
+      GF_INSTALL_PLUGINS: grafana-clock-panel
+    restart: always
+    depends_on:
+      - prometheus
+
+  cadvisor:
+    container_name: cadvisor
+    image: gcr.io/cadvisor/cadvisor:latest
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+    ports:
+      - 127.0.0.1:{{ cadvisor_port }}:8080
+    restart: always
+
+  node-exporter:
+    container_name: node_exporter
+    image: prom/node-exporter:latest
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+    restart: always
+
+  ntfy:
+    container_name: ntfy
+    image: binwiederhier/ntfy:latest
+    command: serve
+    volumes:
+      - {{ monitoring_data_dir }}/ntfy:/var/lib/ntfy
+    ports:
+      - 127.0.0.1:{{ ntfy_port }}:80
+    restart: always

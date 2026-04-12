@@ -1,0 +1,39 @@
+---
+# roles/securite — Tailscale + firewall macOS
+
+- name: "Vérifier si Tailscale est déjà connecté"
+  ansible.builtin.command:
+    cmd: tailscale status --json
+  register: tailscale_current
+  changed_when: false
+  failed_when: false
+  tags: [securite, tailscale]
+
+- name: "Connecter Tailscale avec authkey"
+  ansible.builtin.command:
+    cmd: tailscale up --authkey={{ vault_tailscale_authkey }} --hostname={{ tailscale_hostname }} --accept-routes
+  no_log: true
+  changed_when: true
+  when: >
+    tailscale_current.rc != 0 or
+    (tailscale_current.stdout | from_json).BackendState != "Running"
+  notify: restart tailscale
+  tags: [securite, tailscale]
+
+- name: "Activer le firewall macOS (Application Firewall)"
+  ansible.builtin.command:
+    cmd: /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on
+  become: true
+  register: firewall_result
+  changed_when: "'enabled' not in firewall_result.stdout"
+  failed_when: firewall_result.rc != 0
+  tags: [securite]
+
+- name: "Activer le mode furtif du firewall macOS"
+  ansible.builtin.command:
+    cmd: /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on
+  become: true
+  register: stealth_result
+  changed_when: "'enabled' not in stealth_result.stdout"
+  failed_when: stealth_result.rc != 0
+  tags: [securite]

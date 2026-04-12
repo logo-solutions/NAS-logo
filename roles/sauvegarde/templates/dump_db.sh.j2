@@ -1,0 +1,20 @@
+#!/bin/bash
+# dump_db.sh — dump PostgreSQL Immich via docker exec
+# Généré par Ansible (NAS-logo)
+set -euo pipefail
+
+BACKUP_DIR="{{ backup_dir }}"
+DUMP_FILE="$BACKUP_DIR/immich-db-$(date +%Y%m%d-%H%M%S).sql.gz"
+
+echo "==> Dump PostgreSQL Immich..." >&2
+docker exec immich_postgres pg_dumpall \
+  --clean \
+  --if-exists \
+  --username={{ immich_db_user }} \
+  | gzip > "$DUMP_FILE"
+
+echo "==> Dump écrit : $DUMP_FILE" >&2
+
+# Nettoyer les dumps locaux de plus de 3 jours
+find "$BACKUP_DIR" -name "immich-db-*.sql.gz" -mtime +3 -delete
+echo "==> Nettoyage dumps locaux terminé" >&2
