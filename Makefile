@@ -18,7 +18,7 @@ install: ## Étape 3 : Installation complète
 	ansible-playbook -i $(INVENTORY) site.yml $(VAULT_ARGS)
 
 health: ## Vérification de l'état du système
-	ansible-playbook -i $(INVENTORY) healthcheck.yml
+	ansible-playbook -i $(INVENTORY) healthcheck.yml $(VAULT_ARGS)
 
 backup: ## Sauvegarde manuelle immédiate
 	ansible-playbook -i $(INVENTORY) site.yml $(VAULT_ARGS) --tags sauvegarde
@@ -28,6 +28,14 @@ lint: ## Lint tous les playbooks
 
 claude: ## Optionnel : Claude Code + MCP
 	ansible-playbook -i $(INVENTORY) claude.yml $(VAULT_ARGS)
+
+maintenance-on: ## Suspendre les sauvegardes (mode maintenance)
+	ansible -i $(INVENTORY) macmini -m ansible.builtin.file -a "path=/tmp/nas-logo-maintenance state=touch" $(VAULT_ARGS)
+	@echo "Mode maintenance ON — sauvegardes suspendues"
+
+maintenance-off: ## Reprendre les sauvegardes
+	ansible -i $(INVENTORY) macmini -m ansible.builtin.file -a "path=/tmp/nas-logo-maintenance state=absent" $(VAULT_ARGS)
+	@echo "Mode maintenance OFF — sauvegardes reprises"
 
 help: ## Afficher cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \

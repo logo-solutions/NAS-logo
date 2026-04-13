@@ -29,7 +29,7 @@
 
     - name: "Vérifier qu'Immich répond (port {{ immich_port }})"
       ansible.builtin.uri:
-        url: "http://localhost:{{ immich_port }}/api/server-info/ping"
+        url: "http://localhost:{{ immich_port }}/api/server/ping"
         method: GET
         status_code: 200
         timeout: 10
@@ -61,7 +61,7 @@
 
     - name: "Vérifier que Tailscale est connecté"
       ansible.builtin.command:
-        cmd: tailscale status --json
+        cmd: /usr/local/bin/tailscale status --json
       register: tailscale_status
       changed_when: false
       failed_when: (tailscale_status.stdout | from_json).BackendState != "Running"

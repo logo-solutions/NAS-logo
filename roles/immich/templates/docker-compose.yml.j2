@@ -12,16 +12,17 @@ services:
       - /etc/localtime:/etc/localtime:ro
     env_file: .env
     ports:
-      - ${IMMICH_PORT}:2283
+      - "{{ immich_port }}:{{ immich_port }}"
     depends_on:
       - redis
       - database
     restart: always
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:2283/api/server/ping"]
+      test: ["CMD", "wget", "--spider", "http://127.0.0.1:{{ immich_port }}/api/server/ping"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 120s
 
   immich-machine-learning:
     container_name: immich_machine_learning

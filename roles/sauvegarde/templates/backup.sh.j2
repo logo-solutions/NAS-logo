@@ -11,6 +11,12 @@ notify() {
   curl -s -H "Title: $title" -H "Priority: $priority" -d "$msg" "$NTFY_URL" || true
 }
 
+# Mode maintenance : créer /tmp/nas-logo-maintenance pour suspendre les sauvegardes
+if [ -f /tmp/nas-logo-maintenance ]; then
+  echo "==> Mode maintenance actif — sauvegarde ignorée ($(date))" | tee "$LOG_FILE" >&2
+  exit 0
+fi
+
 echo "==> Sauvegarde NAS-logo démarrée ($(date))" | tee "$LOG_FILE" >&2
 
 # 1. Dump PostgreSQL
