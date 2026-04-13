@@ -31,7 +31,7 @@ grafana_dashboard_node_id: 1860
 backup_dir: "{{ ssd_mount_point }}/backups"
 hetzner_host: "{{ vault_hetzner_host }}"
 hetzner_user: "{{ vault_hetzner_user }}"
-hetzner_remote_path: /immich-backup
+hetzner_remote_path: immich-backup
 backup_daily_keep: 7
 backup_weekly_keep: 4
 backup_monthly_keep: 12
