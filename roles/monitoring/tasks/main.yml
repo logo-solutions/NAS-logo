@@ -109,6 +109,7 @@
   loop: "{{ grafana_dashboard_json.results }}"
   loop_control:
     label: "dashboard {{ item.item }}"
+  when: item.content is defined
   tags: [monitoring, grafana]
 
 - name: "Déployer le script d'alerte disque ntfy"
