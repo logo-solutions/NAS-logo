@@ -21,4 +21,5 @@
       tags: [immich]
     - role: monitoring
       tags: [monitoring, prometheus, grafana]
-    # - role: sauvegarde   # activé en phase 2 (Hetzner Storage Box)
+    - role: sauvegarde
+      tags: [sauvegarde]

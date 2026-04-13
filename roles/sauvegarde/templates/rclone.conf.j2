@@ -4,7 +4,7 @@
 type = sftp
 host = {{ vault_hetzner_host }}
 user = {{ vault_hetzner_user }}
-pass = {{ vault_hetzner_password }}
+pass = {{ vault_hetzner_password_obscured }}
 port = 23
 
 [hetzner-crypt]
@@ -12,4 +12,4 @@ type = crypt
 remote = hetzner:{{ hetzner_remote_path }}
 filename_encryption = standard
 directory_name_encryption = true
-password = {{ vault_hetzner_password }}
+password = {{ vault_rclone_crypt_password }}

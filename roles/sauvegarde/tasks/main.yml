@@ -1,11 +1,14 @@
 ---
 # roles/sauvegarde — rclone + dump PostgreSQL + LaunchAgent cron
 
-- name: "Créer le répertoire de sauvegarde"
+- name: "Créer les répertoires de sauvegarde"
   ansible.builtin.file:
-    path: "{{ backup_dir }}"
+    path: "{{ item }}"
     state: directory
     mode: "0700"
+  loop:
+    - "{{ backup_dir }}"
+    - "{{ ansible_env.HOME }}/.config/rclone"
   tags: [sauvegarde]
 
 - name: "Déployer la configuration rclone"
