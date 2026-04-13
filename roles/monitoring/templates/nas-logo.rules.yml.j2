@@ -1,0 +1,34 @@
+# Alerting rules NAS-logo — généré par Ansible
+groups:
+  - name: nas-logo
+    rules:
+
+      - alert: DiskUsageHigh
+        expr: >
+          (node_filesystem_size_bytes{mountpoint="{{ ssd_mount_point }}"} - node_filesystem_free_bytes{mountpoint="{{ ssd_mount_point }}"})
+          / node_filesystem_size_bytes{mountpoint="{{ ssd_mount_point }}"} * 100
+          > {{ alert_disk_threshold }}
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSD utilisé à plus de {{ alert_disk_threshold }}%"
+          description: "Le SSD {{ ssd_mount_point }} dépasse le seuil d'utilisation."
+
+      - alert: ContainerDown
+        expr: absent(container_last_seen{name=~"immich.*|prometheus|grafana|ntfy"})
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ "{{" }} $labels.name {{ "}}" }} arrêté"
+          description: "Le container {{ "{{" }} $labels.name {{ "}}" }} n'est plus visible depuis 5 minutes."
+
+      - alert: ContainerRestartLoop
+        expr: increase(container_start_time_seconds{name=~"immich.*|prometheus|grafana|ntfy"}[10m]) > 5
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ "{{" }} $labels.name {{ "}}" }} en boucle de redémarrage"
+          description: "Le container {{ "{{" }} $labels.name {{ "}}" }} a redémarré plus de 5 fois en 10 minutes."

@@ -8,12 +8,18 @@ services:
     image: prom/prometheus:latest
     volumes:
       - {{ monitoring_data_dir }}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - {{ monitoring_data_dir }}/prometheus/rules:/etc/prometheus/rules:ro
       - {{ monitoring_data_dir }}/prometheus:/prometheus
     ports:
       - {{ prometheus_port }}:9090
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=30d"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: always
 
   grafana:
@@ -26,6 +32,11 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: {{ vault_grafana_admin_password }}
       GF_INSTALL_PLUGINS: grafana-clock-panel
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: always
     depends_on:
       - prometheus
@@ -39,6 +50,11 @@ services:
       - /sys:/sys:ro
     ports:
       - {{ cadvisor_port }}:8080
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: always
 
   node-exporter:
@@ -51,6 +67,11 @@ services:
     command:
       - "--path.procfs=/host/proc"
       - "--path.sysfs=/host/sys"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9100/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: always
 
   ntfy:
@@ -61,4 +82,9 @@ services:
       - {{ monitoring_data_dir }}/ntfy:/var/lib/ntfy
     ports:
       - {{ ntfy_port }}:80
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: always

@@ -21,7 +21,10 @@ echo "==> Sauvegarde NAS-logo démarrée ($(date))" | tee "$LOG_FILE" >&2
 
 # 1. Dump PostgreSQL
 echo "==> Dump base de données..." | tee -a "$LOG_FILE" >&2
-/usr/local/bin/nas-logo-dump-db.sh 2>&1 | tee -a "$LOG_FILE"
+if ! /usr/local/bin/nas-logo-dump-db.sh 2>&1 | tee -a "$LOG_FILE"; then
+  notify "NAS-logo Dump DB échoué" "Le dump PostgreSQL a échoué — sauvegarde annulée. Voir $LOG_FILE." "urgent"
+  exit 1
+fi
 
 # 2. Sync vers Hetzner chiffré
 echo "==> Sync rclone vers Hetzner..." | tee -a "$LOG_FILE" >&2

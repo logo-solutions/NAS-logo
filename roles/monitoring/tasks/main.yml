@@ -8,10 +8,19 @@
     mode: "0750"
   loop:
     - "{{ monitoring_data_dir }}/prometheus"
+    - "{{ monitoring_data_dir }}/prometheus/rules"
     - "{{ monitoring_data_dir }}/grafana"
     - "{{ monitoring_data_dir }}/ntfy"
     - "{{ ansible_env.HOME }}/monitoring"
   tags: [monitoring]
+
+- name: "Déployer les alerting rules Prometheus"
+  ansible.builtin.template:
+    src: nas-logo.rules.yml.j2
+    dest: "{{ monitoring_data_dir }}/prometheus/rules/nas-logo.rules.yml"
+    mode: "0640"
+  notify: restart monitoring
+  tags: [monitoring, prometheus]
 
 - name: "Déployer la configuration Prometheus"
   ansible.builtin.template:

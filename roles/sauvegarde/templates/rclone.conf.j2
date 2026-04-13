@@ -4,7 +4,7 @@
 type = sftp
 host = {{ vault_hetzner_host }}
 user = {{ vault_hetzner_user }}
-pass = {{ vault_hetzner_password | community.general.bcrypt }}
+pass = {{ vault_hetzner_password }}
 port = 23
 
 [hetzner-crypt]
