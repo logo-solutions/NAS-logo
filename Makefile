@@ -21,7 +21,7 @@ health: ## Vérification de l'état du système
 	ansible-playbook -i $(INVENTORY) healthcheck.yml $(VAULT_ARGS)
 
 backup: ## Sauvegarde manuelle immédiate
-	ansible-playbook -i $(INVENTORY) site.yml $(VAULT_ARGS) --tags sauvegarde
+	ssh logo@100.113.214.55 "/usr/local/bin/nas-logo-backup.sh"
 
 lint: ## Lint tous les playbooks
 	ansible-lint site.yml bootstrap.yml preflight.yml healthcheck.yml
