@@ -67,6 +67,50 @@
       failed_when: (tailscale_status.stdout | from_json).BackendState != "Running"
       tags: [health, tailscale]
 
+    - name: "Récupérer l'IP Tailscale courante"
+      ansible.builtin.set_fact:
+        ts_ip: "{{ (tailscale_status.stdout | from_json).TailscaleIPs | first }}"
+      tags: [health, tailscale]
+
+    - name: "Vérifier l'IP Tailscale attendue"
+      ansible.builtin.assert:
+        that: ts_ip == nas_ip
+        fail_msg: "IP Tailscale inattendue : {{ ts_ip }} (attendu : {{ nas_ip }})"
+        success_msg: "IP Tailscale OK : {{ ts_ip }}"
+      tags: [health, tailscale]
+
+    - name: "Vérifier Immich via IP Tailscale (simulation externe)"
+      ansible.builtin.uri:
+        url: "http://{{ nas_ip }}:{{ immich_port }}/api/server/ping"
+        method: GET
+        status_code: 200
+        timeout: 10
+      tags: [health, tailscale]
+
+    - name: "Vérifier Paperless via IP Tailscale (simulation externe)"
+      ansible.builtin.uri:
+        url: "http://{{ nas_ip }}:{{ paperless_port }}/api/"
+        method: GET
+        status_code: [200, 401]
+        timeout: 10
+      tags: [health, tailscale]
+
+    - name: "Vérifier Grafana via IP Tailscale (simulation externe)"
+      ansible.builtin.uri:
+        url: "http://{{ nas_ip }}:{{ grafana_port }}/api/health"
+        method: GET
+        status_code: 200
+        timeout: 10
+      tags: [health, tailscale]
+
+    - name: "Vérifier Meilisearch via IP Tailscale (simulation externe)"
+      ansible.builtin.uri:
+        url: "http://{{ nas_ip }}:{{ meilisearch_port }}/health"
+        method: GET
+        status_code: 200
+        timeout: 10
+      tags: [health, tailscale]
+
     - name: "Health check réussi"
       ansible.builtin.debug:
         msg: "Tous les services sont opérationnels."

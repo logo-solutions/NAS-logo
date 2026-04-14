@@ -3,7 +3,7 @@ VAULT_PASS_FILE := $(HOME)/.nas-logo-vault-pass
 BECOME_PASS_FILE := $(HOME)/.nas-logo-become-pass
 VAULT_ARGS := --vault-password-file $(VAULT_PASS_FILE) --become-password-file $(BECOME_PASS_FILE)
 
-.PHONY: bootstrap preflight dryrun install health backup lint claude
+.PHONY: bootstrap preflight dryrun install health backup lint claude tailscale-test
 
 bootstrap: ## Étape 1 : Homebrew + Ansible + dépendances système
 	bash bootstrap.sh
@@ -28,6 +28,9 @@ lint: ## Lint tous les playbooks
 
 claude: ## Optionnel : Claude Code + MCP
 	ansible-playbook -i $(INVENTORY) claude.yml $(VAULT_ARGS)
+
+tailscale-test: ## Tester l'accès Tailscale depuis ce laptop (hors réseau interne)
+	ansible-playbook tailscale-test.yml
 
 maintenance-on: ## Suspendre les sauvegardes (mode maintenance)
 	ansible -i $(INVENTORY) macmini -m ansible.builtin.file -a "path=/tmp/nas-logo-maintenance state=touch" $(VAULT_ARGS)

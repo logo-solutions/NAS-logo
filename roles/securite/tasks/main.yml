@@ -1,12 +1,47 @@
 ---
 # roles/securite — Tailscale + firewall macOS
 
+# ── Tailscale ──────────────────────────────────────────────────────────────────
+
+- name: "Installer Tailscale via Homebrew"
+  community.general.homebrew_cask:
+    name: tailscale
+    state: present
+  tags: [securite, tailscale]
+
+- name: "Vérifier l'état Tailscale (BackendState)"
+  ansible.builtin.command:
+    cmd: /usr/local/bin/tailscale status --json
+  register: tailscale_status_json
+  changed_when: false
+  failed_when: false
+  tags: [securite, tailscale]
+
+- name: "Authentifier Tailscale si non connecté"
+  ansible.builtin.command: >
+    /usr/local/bin/tailscale up
+    --authkey="{{ vault_tailscale_authkey }}"
+    --hostname="{{ tailscale_hostname }}"
+    --accept-dns=false
+    --reset
+  when: >
+    tailscale_status_json.rc != 0 or
+    (tailscale_status_json.stdout | from_json).BackendState != "Running"
+  no_log: true
+  changed_when: true
+  tags: [securite, tailscale]
+
 - name: "Vérifier que Tailscale est connecté"
   ansible.builtin.command:
-    cmd: /usr/local/bin/tailscale status
-  register: tailscale_status
+    cmd: /usr/local/bin/tailscale status --json
+  register: tailscale_final
   changed_when: false
-  failed_when: tailscale_status.rc != 0
+  failed_when: (tailscale_final.stdout | from_json).BackendState != "Running"
+  tags: [securite, tailscale]
+
+- name: "Afficher l'IP Tailscale"
+  ansible.builtin.debug:
+    msg: "IP Tailscale : {{ (tailscale_final.stdout | from_json).TailscaleIPs | first }}"
   tags: [securite, tailscale]
 
 - name: "Activer le firewall macOS (Application Firewall)"
