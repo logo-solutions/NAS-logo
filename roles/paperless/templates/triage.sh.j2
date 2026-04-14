@@ -1,0 +1,72 @@
+#!/bin/bash
+# triage.sh — OCR Tesseract : texte → Paperless, photo → Immich (via API)
+# Généré par Ansible (NAS-logo)
+set -euo pipefail
+
+OCR_THRESHOLD={{ paperless_ocr_threshold }}
+CONSUME_DIR="{{ paperless_data_dir }}/consume"
+IMMICH_URL="http://localhost:{{ immich_port }}"
+IMMICH_API_KEY="{{ immich_api_key }}"
+TESSERACT="{{ tesseract_bin }}"
+MAGICK=/opt/homebrew/bin/magick
+WORK_DIR="$HOME/.nas-logo-triage-tmp"
+
+mkdir -p "$WORK_DIR"
+
+FILE="$1"
+
+if [ -z "$FILE" ] || [ ! -f "$FILE" ]; then
+  echo "Usage: $0 <fichier>" >&2
+  exit 1
+fi
+
+EXT="${FILE##*.}"
+EXT_LOWER=$(echo "$EXT" | tr '[:upper:]' '[:lower:]')
+
+upload_immich() {
+  local f="$1"
+  local fname
+  fname=$(basename "$f")
+  local mtime
+  mtime=$(stat -f "%Sm" -t "%Y-%m-%dT%H:%M:%S.000Z" "$f" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+
+  curl -sf -X POST "${IMMICH_URL}/api/assets" \
+    -H "x-api-key: ${IMMICH_API_KEY}" \
+    -F "assetData=@${f};type=image/${EXT_LOWER}" \
+    -F "deviceAssetId=${fname}" \
+    -F "deviceId=nas-logo-triage" \
+    -F "fileCreatedAt=${mtime}" \
+    -F "fileModifiedAt=${mtime}" \
+    -o /dev/null
+}
+
+# PDF → toujours Paperless
+if [ "$EXT_LOWER" = "pdf" ]; then
+  echo "PDF détecté → Paperless"
+  cp "$FILE" "$CONSUME_DIR/"
+  exit 0
+fi
+
+# Image → auto-orient + OCR pour décider
+if [[ "$EXT_LOWER" =~ ^(jpg|jpeg|png|tiff|tif|bmp)$ ]]; then
+  TMPFILE="$WORK_DIR/$(basename "$FILE").triage.jpg"
+  "$MAGICK" "$FILE" -auto-orient -strip "$TMPFILE" 2>/dev/null || cp "$FILE" "$TMPFILE"
+
+  CHAR_COUNT=$("$TESSERACT" "$TMPFILE" stdout -l fra+eng 2>/dev/null | tr -d '[:space:]' | wc -c | tr -d ' ') || CHAR_COUNT=0
+  rm -f "$TMPFILE"
+
+  if [ "$CHAR_COUNT" -gt "$OCR_THRESHOLD" ]; then
+    echo "Texte détecté ($CHAR_COUNT chars) → Paperless"
+    cp "$FILE" "$CONSUME_DIR/"
+    DOCKER_HOST="unix:///Users/{{ mac_user }}/.colima/default/docker.sock" \
+      {{ docker_bin }} exec paperless python3 manage.py document_consumer --oneshot \
+      > /dev/null 2>&1 &
+  else
+    echo "Pas de texte ($CHAR_COUNT chars) → Immich"
+    upload_immich "$FILE"
+  fi
+  exit 0
+fi
+
+echo "Format non supporté : $EXT_LOWER" >&2
+exit 1

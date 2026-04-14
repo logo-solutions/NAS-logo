@@ -1,0 +1,74 @@
+---
+# roles/paperless — Paperless-ngx + triage OCR Tesseract
+
+- name: "Installer Tesseract via Homebrew"
+  community.general.homebrew:
+    name: tesseract
+    state: present
+  tags: [paperless]
+
+- name: "Installer le pack de langue française Tesseract"
+  community.general.homebrew:
+    name: tesseract-lang
+    state: present
+  tags: [paperless]
+
+- name: "Créer les répertoires Paperless sur le SSD"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0750"
+  loop:
+    - "{{ paperless_data_dir }}/data"
+    - "{{ paperless_data_dir }}/media"
+    - "{{ paperless_data_dir }}/consume"
+    - "{{ paperless_data_dir }}/export"
+    - "{{ paperless_data_dir }}/redis"
+    - "{{ ansible_env.HOME }}/paperless"
+  tags: [paperless]
+
+- name: "Déployer docker-compose.paperless.yml"
+  ansible.builtin.template:
+    src: docker-compose.paperless.yml.j2
+    dest: "{{ ansible_env.HOME }}/paperless/docker-compose.yml"
+    mode: "0640"
+  notify: restart paperless
+  tags: [paperless]
+
+- name: "Démarrer la stack Paperless"
+  community.docker.docker_compose_v2:
+    project_src: "{{ ansible_env.HOME }}/paperless"
+    state: present
+    pull: always
+    docker_cli: "{{ docker_bin }}"
+  environment:
+    DOCKER_HOST: "{{ docker_host }}"
+  tags: [paperless]
+
+- name: "Attendre que Paperless soit prêt"
+  ansible.builtin.uri:
+    url: "http://localhost:{{ paperless_port }}/accounts/login/"
+    method: GET
+    status_code: 200
+    timeout: 10
+  retries: 12
+  delay: 10
+  register: paperless_health
+  until: paperless_health.status == 200
+  tags: [paperless]
+
+- name: "Déployer le script de triage OCR"
+  ansible.builtin.template:
+    src: triage.sh.j2
+    dest: "{{ triage_bin }}"
+    mode: "0755"
+  become: true
+  tags: [paperless]
+
+- name: "Déployer le script d'import one-shot"
+  ansible.builtin.template:
+    src: import-scans.sh.j2
+    dest: /usr/local/bin/nas-logo-import-scans.sh
+    mode: "0755"
+  become: true
+  tags: [paperless]

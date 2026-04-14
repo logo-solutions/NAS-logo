@@ -23,3 +23,5 @@
       tags: [monitoring, prometheus, grafana]
     - role: sauvegarde
       tags: [sauvegarde]
+    - role: paperless
+      tags: [paperless]

@@ -1,0 +1,8 @@
+---
+- name: restart paperless
+  community.docker.docker_compose_v2:
+    project_src: "{{ ansible_env.HOME }}/paperless"
+    state: restarted
+    docker_cli: "{{ docker_bin }}"
+  environment:
+    DOCKER_HOST: "{{ docker_host }}"

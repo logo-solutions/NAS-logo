@@ -1,0 +1,44 @@
+#!/bin/bash
+# import-scans.sh — import one-shot d'un dossier de scans avec triage
+# Généré par Ansible (NAS-logo)
+# Usage : /usr/local/bin/nas-logo-import-scans.sh /chemin/vers/scans
+set -euo pipefail
+
+SOURCE_DIR="$1"
+TRIAGE="{{ triage_bin }}"
+LOG_FILE="/tmp/nas-logo-import-scans.log"
+
+if [ -z "$SOURCE_DIR" ] || [ ! -d "$SOURCE_DIR" ]; then
+  echo "Usage: $0 <dossier-source>" >&2
+  exit 1
+fi
+
+echo "==> Import scans depuis $SOURCE_DIR ($(date))" | tee "$LOG_FILE"
+echo "==> Seuil OCR : {{ paperless_ocr_threshold }} caractères" | tee -a "$LOG_FILE"
+
+TOTAL=0
+DOCS=0
+PHOTOS=0
+ERRORS=0
+
+while IFS= read -r -d '' FILE; do
+  TOTAL=$((TOTAL + 1))
+  if OUTPUT=$("$TRIAGE" "$FILE" 2>&1); then
+    echo "[$TOTAL] $OUTPUT — $(basename "$FILE")" | tee -a "$LOG_FILE"
+    if echo "$OUTPUT" | grep -q "Paperless"; then
+      DOCS=$((DOCS + 1))
+    else
+      PHOTOS=$((PHOTOS + 1))
+    fi
+  else
+    echo "[$TOTAL] ERREUR — $(basename "$FILE")" | tee -a "$LOG_FILE"
+    ERRORS=$((ERRORS + 1))
+  fi
+done < <(find "$SOURCE_DIR" -type f \( \
+  -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \
+  -o -iname "*.tiff" -o -iname "*.tif" -o -iname "*.pdf" \
+  \) -print0)
+
+echo "" | tee -a "$LOG_FILE"
+echo "==> Terminé ($(date))" | tee -a "$LOG_FILE"
+echo "==> Total : $TOTAL fichiers — $DOCS documents (Paperless) — $PHOTOS photos (Immich) — $ERRORS erreurs" | tee -a "$LOG_FILE"

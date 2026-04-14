@@ -39,6 +39,16 @@ backup_monthly_keep: 12
 # Tailscale
 tailscale_hostname: macmini
 
+# Immich
+immich_api_key: "{{ vault_immich_api_key }}"
+
+# Paperless-ngx
+paperless_port: 8010
+paperless_data_dir: "{{ ssd_mount_point }}/paperless"
+paperless_ocr_threshold: 20
+tesseract_bin: /opt/homebrew/bin/tesseract
+triage_bin: /usr/local/bin/nas-logo-triage.sh
+
 # Docker (Colima sur Apple Silicon)
 docker_bin: /opt/homebrew/bin/docker
 docker_host: "unix:///Users/{{ ansible_user_id }}/.colima/default/docker.sock"
