@@ -29,3 +29,5 @@
       tags: [recherche, meilisearch]
     - role: smb
       tags: [smb]
+    - role: gmail
+      tags: [gmail]

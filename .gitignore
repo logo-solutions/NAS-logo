@@ -4,8 +4,8 @@
 .nas-logo-vault-pass
 
 # Ne jamais committer vault.yml décrypté
-# Chiffrer avec : ansible-vault encrypt inventory/group_vars/vault.yml
-inventory/group_vars/vault.yml
+# Chiffrer avec : ansible-vault encrypt inventory/group_vars/all/vault.yml
+inventory/group_vars/**/vault.yml
 
 # Fichiers générés
 *.retry

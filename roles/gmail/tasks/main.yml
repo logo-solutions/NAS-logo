@@ -1,0 +1,28 @@
+---
+# roles/gmail — import Gmail → Paperless (docs) + Immich (photos/vidéos)
+
+- name: "Déployer le script gmail-fetch"
+  ansible.builtin.template:
+    src: gmail-fetch.py.j2
+    dest: /usr/local/bin/nas-logo-gmail-fetch.py
+    mode: "0755"
+  become: true
+  no_log: true
+  tags: [gmail]
+
+- name: "Déployer le LaunchAgent gmail (toutes les heures)"
+  ansible.builtin.template:
+    src: com.nas-logo.gmail.plist.j2
+    dest: "{{ ansible_env.HOME }}/Library/LaunchAgents/com.nas-logo.gmail.plist"
+    mode: "0644"
+  notify: reload gmail launchagent
+  tags: [gmail]
+
+- name: "Charger le LaunchAgent gmail"
+  ansible.builtin.command: >
+    launchctl load -w
+    {{ ansible_env.HOME }}/Library/LaunchAgents/com.nas-logo.gmail.plist
+  register: gmail_load
+  changed_when: gmail_load.rc == 0
+  failed_when: gmail_load.rc not in [0, 1]
+  tags: [gmail]

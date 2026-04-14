@@ -85,6 +85,9 @@ immich_users:
     name: "Ilan"
     password: "{{ vault_immich_ilan_password }}"
 
+# Gmail → Paperless / Immich
+gmail_user: "{{ vault_gmail_user }}"
+
 # Docker (Colima sur Apple Silicon)
 docker_bin: /opt/homebrew/bin/docker
 docker_host: "unix:///Users/{{ ansible_user_id }}/.colima/default/docker.sock"

@@ -1,0 +1,127 @@
+#!/bin/bash
+# restore.sh — restauration depuis Hetzner Storage Box (chiffré rclone)
+# Généré par Ansible (NAS-logo)
+#
+# Usage :
+#   nas-logo-restore.sh                  → restaure depuis current (dernier backup)
+#   nas-logo-restore.sh --list           → liste les versions disponibles
+#   nas-logo-restore.sh --version 20260413  → restaure depuis une version spécifique
+#   nas-logo-restore.sh --dry-run        → simule sans écrire
+set -euo pipefail
+
+RCLONE=/opt/homebrew/bin/rclone
+DOCKER=/opt/homebrew/bin/docker
+DOCKER_HOST="unix:///Users/{{ mac_user }}/.colima/default/docker.sock"
+export DOCKER_HOST
+
+SSD="{{ ssd_mount_point }}"
+BACKUP_DIR="{{ backup_dir }}"
+NTFY_URL="http://localhost:{{ ntfy_port }}/{{ ntfy_topic }}"
+LOG_FILE="/tmp/nas-logo-restore.log"
+
+VERSION="current"
+DRY_RUN=false
+
+notify() {
+  local title="$1" msg="$2" priority="${3:-default}"
+  curl -s -H "Title: $title" -H "Priority: $priority" -d "$msg" "$NTFY_URL" || true
+}
+
+usage() {
+  grep '^#' "$0" | grep -v '#!/' | sed 's/^# //'
+  exit 0
+}
+
+# ── Parsing arguments ───────────────────────────────────────────────────────
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --list)
+      echo "==> Versions disponibles sur Hetzner :"
+      $RCLONE lsd hetzner-crypt:versions 2>/dev/null | awk '{print $NF}' | sort -r
+      echo ""
+      echo "==> Dernière sauvegarde (current) :"
+      $RCLONE lsl hetzner-crypt:current --max-depth 1 2>/dev/null | tail -5
+      exit 0
+      ;;
+    --version)
+      VERSION="$2"; shift ;;
+    --dry-run)
+      DRY_RUN=true ;;
+    --help|-h)
+      usage ;;
+    *)
+      echo "Option inconnue : $1" >&2; exit 1 ;;
+  esac
+  shift
+done
+
+# ── Sécurité ────────────────────────────────────────────────────────────────
+if [[ "$VERSION" == "current" ]]; then
+  REMOTE="hetzner-crypt:current"
+else
+  REMOTE="hetzner-crypt:versions/${VERSION}"
+  # Vérifier que la version existe
+  if ! $RCLONE lsd hetzner-crypt:versions 2>/dev/null | grep -q "$VERSION"; then
+    echo "ERREUR : version '$VERSION' introuvable sur Hetzner." >&2
+    echo "Utilisez --list pour voir les versions disponibles." >&2
+    exit 1
+  fi
+fi
+
+echo "==> Restauration NAS-logo démarrée ($(date))" | tee "$LOG_FILE"
+echo "==> Source  : $REMOTE" | tee -a "$LOG_FILE"
+echo "==> Cible   : $SSD" | tee -a "$LOG_FILE"
+[[ "$DRY_RUN" == "true" ]] && echo "==> MODE DRY-RUN — aucune écriture" | tee -a "$LOG_FILE"
+
+notify "NAS-logo Restore démarré" "Restauration depuis $REMOTE vers $SSD." "default"
+
+# ── 1. Arrêt Immich ─────────────────────────────────────────────────────────
+echo "==> Arrêt des conteneurs Immich..." | tee -a "$LOG_FILE"
+if [[ "$DRY_RUN" == "false" ]]; then
+  $DOCKER compose -f ~/immich/docker-compose.yml down 2>&1 | tee -a "$LOG_FILE" || true
+fi
+
+# ── 2. Restauration des fichiers depuis Hetzner ─────────────────────────────
+echo "==> Restauration des fichiers (rclone sync)..." | tee -a "$LOG_FILE"
+RCLONE_ARGS=(
+  --log-level INFO
+  --log-file "$LOG_FILE"
+  --exclude "backups/**"
+)
+[[ "$DRY_RUN" == "true" ]] && RCLONE_ARGS+=(--dry-run)
+
+$RCLONE sync "$REMOTE" "$SSD" "${RCLONE_ARGS[@]}"
+
+# ── 3. Restauration de la base PostgreSQL ───────────────────────────────────
+echo "==> Recherche du dump PostgreSQL le plus récent..." | tee -a "$LOG_FILE"
+LATEST_DUMP=$(ls -t "$BACKUP_DIR"/immich-db-*.sql.gz 2>/dev/null | head -1 || true)
+
+if [[ -z "$LATEST_DUMP" ]]; then
+  echo "AVERTISSEMENT : aucun dump PostgreSQL trouvé dans $BACKUP_DIR." | tee -a "$LOG_FILE"
+  echo "==> Redémarrage Immich sans restauration DB..." | tee -a "$LOG_FILE"
+else
+  echo "==> Dump trouvé : $LATEST_DUMP" | tee -a "$LOG_FILE"
+
+  if [[ "$DRY_RUN" == "false" ]]; then
+    echo "==> Démarrage PostgreSQL seul..." | tee -a "$LOG_FILE"
+    $DOCKER compose -f ~/immich/docker-compose.yml up -d database 2>&1 | tee -a "$LOG_FILE"
+    sleep 5
+
+    echo "==> Restauration PostgreSQL..." | tee -a "$LOG_FILE"
+    zcat "$LATEST_DUMP" | $DOCKER exec -i immich_postgres psql \
+      --username=immich \
+      --dbname=immich \
+      2>&1 | tee -a "$LOG_FILE"
+  else
+    echo "==> [dry-run] Restaurerait : $LATEST_DUMP" | tee -a "$LOG_FILE"
+  fi
+fi
+
+# ── 4. Redémarrage Immich ────────────────────────────────────────────────────
+echo "==> Redémarrage des conteneurs Immich..." | tee -a "$LOG_FILE"
+if [[ "$DRY_RUN" == "false" ]]; then
+  $DOCKER compose -f ~/immich/docker-compose.yml up -d 2>&1 | tee -a "$LOG_FILE"
+fi
+
+echo "==> Restauration terminée ($(date))" | tee -a "$LOG_FILE"
+notify "NAS-logo Restore OK" "Restauration terminée depuis $REMOTE. Voir $LOG_FILE." "low"

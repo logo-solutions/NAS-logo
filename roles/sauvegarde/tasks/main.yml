@@ -35,6 +35,14 @@
   become: true
   tags: [sauvegarde, rclone]
 
+- name: "Déployer le script de restauration"
+  ansible.builtin.template:
+    src: restore.sh.j2
+    dest: /usr/local/bin/nas-logo-restore.sh
+    mode: "0755"
+  become: true
+  tags: [sauvegarde, restore]
+
 - name: "Déployer le LaunchAgent de sauvegarde quotidienne"
   ansible.builtin.template:
     src: com.nas-logo.backup.plist.j2

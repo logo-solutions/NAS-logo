@@ -1,0 +1,6 @@
+---
+- name: reload gmail launchagent
+  ansible.builtin.command: >
+    launchctl kickstart -k gui/{{ ansible_user_uid }}/com.nas-logo.gmail
+  changed_when: false
+  ignore_errors: true

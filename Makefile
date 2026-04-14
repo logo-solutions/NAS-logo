@@ -23,11 +23,26 @@ health: ## Vérification de l'état du système
 backup: ## Sauvegarde manuelle immédiate
 	ssh logo@100.113.214.55 "/usr/local/bin/nas-logo-backup.sh"
 
+restore-list: ## Lister les versions de sauvegarde disponibles
+	ssh logo@100.113.214.55 "/usr/local/bin/nas-logo-restore.sh --list"
+
+restore-dry: ## Simuler une restauration (dry-run)
+	ssh logo@100.113.214.55 "/usr/local/bin/nas-logo-restore.sh --dry-run"
+
+restore: ## Restaurer depuis Hetzner (current). VERSION=20260413 pour une date précise
+	ssh logo@100.113.214.55 "/usr/local/bin/nas-logo-restore.sh $(if $(VERSION),--version $(VERSION),)"
+
 lint: ## Lint tous les playbooks
 	ansible-lint site.yml bootstrap.yml preflight.yml healthcheck.yml
 
 claude: ## Optionnel : Claude Code + MCP
 	ansible-playbook -i $(INVENTORY) claude.yml $(VAULT_ARGS)
+
+gmail-dry: ## Simuler l'import Gmail (dry-run, sans modifier la boite)
+	ssh logo@100.113.214.55 "python3 /usr/local/bin/nas-logo-gmail-fetch.py --dry-run"
+
+gmail-run: ## Lancer l'import Gmail maintenant (production)
+	ssh logo@100.113.214.55 "python3 /usr/local/bin/nas-logo-gmail-fetch.py"
 
 tailscale-test: ## Tester l'accès Tailscale depuis ce laptop (hors réseau interne)
 	ansible-playbook tailscale-test.yml

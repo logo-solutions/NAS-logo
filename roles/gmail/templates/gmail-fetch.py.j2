@@ -1,0 +1,325 @@
+#!/usr/bin/env python3
+# gmail-fetch.py — importe les emails Gmail vers Paperless (docs) et Immich (photos/vidéos)
+# Généré par Ansible (NAS-logo)
+#
+# Usage : python3 /usr/local/bin/nas-logo-gmail-fetch.py [--dry-run]
+
+import imaplib
+import email
+import email.header
+import os
+import sys
+import json
+import urllib.request
+import urllib.parse
+import mimetypes
+import tempfile
+import logging
+from datetime import datetime
+from pathlib import Path
+
+# ── Configuration ────────────────────────────────────────────────────────────
+GMAIL_USER     = "{{ vault_gmail_user }}"
+GMAIL_PASSWORD = "{{ vault_gmail_app_password }}"
+IMAP_HOST      = "imap.gmail.com"
+IMAP_PORT      = 993
+
+PAPERLESS_URL   = "http://localhost:{{ paperless_port }}"
+PAPERLESS_TOKEN = "{{ vault_paperless_api_token }}"
+
+IMMICH_URL = "http://localhost:{{ immich_port }}"
+IMMICH_KEY = "{{ vault_immich_api_key }}"
+
+NTFY_URL   = "http://localhost:{{ ntfy_port }}/{{ vault_ntfy_topic }}"
+
+STATE_FILE = "{{ ansible_env.HOME }}/.nas-logo-gmail-state.json"
+LOG_FILE   = "/tmp/nas-logo-gmail-fetch.log"
+
+LABEL_DONE = "NAS-archivé"
+
+# Extensions → destination
+PAPERLESS_EXT = {
+    '.pdf', '.docx', '.doc', '.odt', '.txt', '.csv',
+    '.xlsx', '.xls', '.ods', '.tiff', '.tif', '.rtf', '.eml'
+}
+IMMICH_EXT = {
+    '.jpg', '.jpeg', '.png', '.heic', '.heif', '.gif',
+    '.bmp', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.m4v', '.3gp'
+}
+
+DRY_RUN = "--dry-run" in sys.argv
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler(),
+    ]
+)
+log = logging.getLogger(__name__)
+
+# ── État (emails déjà traités) ───────────────────────────────────────────────
+def load_state():
+    if Path(STATE_FILE).exists():
+        with open(STATE_FILE) as f:
+            return json.load(f)
+    return {"processed": []}
+
+def save_state(state):
+    if not DRY_RUN:
+        with open(STATE_FILE, "w") as f:
+            json.dump(state, f)
+
+# ── Notifications ntfy ───────────────────────────────────────────────────────
+def notify(title, msg, priority="default"):
+    try:
+        req = urllib.request.Request(
+            NTFY_URL,
+            data=msg.encode(),
+            headers={"Title": title, "Priority": priority},
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
+
+# ── Upload vers Paperless ────────────────────────────────────────────────────
+def upload_paperless(filepath, title):
+    boundary = "NASlogoBoundary"
+    with open(filepath, "rb") as f:
+        file_data = f.read()
+
+    filename = Path(filepath).name
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="document"; filename="{filename}"\r\n'
+        f"Content-Type: application/octet-stream\r\n\r\n"
+    ).encode() + file_data + (
+        f"\r\n--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="title"\r\n\r\n'
+        f"{title}\r\n"
+        f"--{boundary}--\r\n"
+    ).encode()
+
+    req = urllib.request.Request(
+        f"{PAPERLESS_URL}/api/documents/post_document/",
+        data=body,
+        headers={
+            "Authorization": f"Token {PAPERLESS_TOKEN}",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        },
+        method="POST",
+    )
+    resp = urllib.request.urlopen(req, timeout=30)
+    return resp.status in (200, 201)
+
+# ── Upload vers Immich ───────────────────────────────────────────────────────
+def upload_immich(filepath, created_at):
+    boundary = "NASlogoBoundary"
+    filename = Path(filepath).name
+    device_asset_id = f"gmail-{filename}-{created_at}"
+    created_str = created_at.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+    with open(filepath, "rb") as f:
+        file_data = f.read()
+
+    mime_type, _ = mimetypes.guess_type(filepath)
+    mime_type = mime_type or "application/octet-stream"
+
+    def field(name, value):
+        return (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+            f"{value}\r\n"
+        ).encode()
+
+    body = (
+        field("deviceAssetId", device_asset_id)
+        + field("deviceId", "nas-logo-gmail")
+        + field("fileCreatedAt", created_str)
+        + field("fileModifiedAt", created_str)
+        + (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="assetData"; filename="{filename}"\r\n'
+            f"Content-Type: {mime_type}\r\n\r\n"
+        ).encode()
+        + file_data
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
+
+    req = urllib.request.Request(
+        f"{IMMICH_URL}/api/assets",
+        data=body,
+        headers={
+            "x-api-key": IMMICH_KEY,
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        },
+        method="POST",
+    )
+    try:
+        resp = urllib.request.urlopen(req, timeout=60)
+        return resp.status in (200, 201)
+    except urllib.error.HTTPError as e:
+        if e.code == 200:
+            return True
+        log.warning(f"Immich HTTP {e.code} pour {filename}")
+        return False
+
+# ── Décodage nom de fichier ───────────────────────────────────────────────────
+def decode_filename(raw):
+    parts = email.header.decode_header(raw)
+    result = ""
+    for part, enc in parts:
+        if isinstance(part, bytes):
+            result += part.decode(enc or "utf-8", errors="replace")
+        else:
+            result += part
+    return result.strip()
+
+# ── Traitement d'un email ────────────────────────────────────────────────────
+def process_email(msg, subject, date):
+    stats = {"paperless": 0, "immich": 0, "skipped": 0}
+
+    for part in msg.walk():
+        if part.get_content_maintype() == "multipart":
+            continue
+        # Ignorer les images inline (signatures, logos de newsletters)
+        disposition = part.get("Content-Disposition", "")
+        if "attachment" not in disposition.lower():
+            continue
+
+        raw_filename = part.get_filename()
+        if not raw_filename:
+            continue
+
+        filename = decode_filename(raw_filename)
+        ext = Path(filename).suffix.lower()
+
+        if ext not in PAPERLESS_EXT and ext not in IMMICH_EXT:
+            log.info(f"  Ignoré (type inconnu) : {filename}")
+            stats["skipped"] += 1
+            continue
+
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+            tmp.write(part.get_payload(decode=True))
+            tmp_path = tmp.name
+
+        try:
+            if ext in PAPERLESS_EXT:
+                log.info(f"  → Paperless : {filename}")
+                if not DRY_RUN:
+                    ok = upload_paperless(tmp_path, f"{subject} — {filename}")
+                    if ok:
+                        stats["paperless"] += 1
+                    else:
+                        log.warning(f"  Échec Paperless : {filename}")
+                else:
+                    stats["paperless"] += 1
+
+            elif ext in IMMICH_EXT:
+                log.info(f"  → Immich : {filename}")
+                if not DRY_RUN:
+                    ok = upload_immich(tmp_path, date)
+                    if ok:
+                        stats["immich"] += 1
+                    else:
+                        log.warning(f"  Échec Immich : {filename}")
+                else:
+                    stats["immich"] += 1
+        finally:
+            os.unlink(tmp_path)
+
+    return stats
+
+# ── Main ─────────────────────────────────────────────────────────────────────
+def main():
+    log.info(f"=== Gmail fetch démarré {'(DRY-RUN) ' if DRY_RUN else ''}=== {datetime.now()}")
+
+    state = load_state()
+    processed_ids = set(state.get("processed", []))
+
+    # Connexion IMAP
+    imap = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT)
+    imap.login(GMAIL_USER, GMAIL_PASSWORD)
+    imap.select("INBOX")
+
+    # Récupérer tous les emails
+    _, data = imap.search(None, "ALL")
+    msg_ids = data[0].split()
+    log.info(f"{len(msg_ids)} emails dans INBOX")
+
+    total = {"paperless": 0, "immich": 0, "skipped": 0, "emails": 0}
+    newly_processed = []
+
+    for msg_id in msg_ids:
+        uid = msg_id.decode()
+        if uid in processed_ids:
+            continue
+
+        _, msg_data = imap.fetch(msg_id, "(RFC822)")
+        raw = msg_data[0][1]
+        msg = email.message_from_bytes(raw)
+
+        # Sujet
+        raw_subject = msg.get("Subject", "(sans objet)")
+        subject_parts = email.header.decode_header(raw_subject)
+        subject = ""
+        for part, enc in subject_parts:
+            if isinstance(part, bytes):
+                try:
+                    subject += part.decode(enc or "utf-8", errors="replace")
+                except LookupError:
+                    subject += part.decode("latin-1", errors="replace")
+            else:
+                subject += part
+
+        # Date
+        date_str = msg.get("Date", "")
+        try:
+            date = email.utils.parsedate_to_datetime(date_str)
+        except Exception:
+            date = datetime.now()
+
+        log.info(f"Email [{uid}] : {subject[:60]}")
+        stats = process_email(msg, subject, date)
+
+        for k in total:
+            if k in stats:
+                total[k] += stats[k]
+        total["emails"] += 1
+        newly_processed.append(uid)
+
+        # Archiver dans Gmail
+        if not DRY_RUN:
+            # Créer le label NAS-archivé si nécessaire
+            imap.create(LABEL_DONE)
+            # Copier vers NAS-archivé
+            imap.copy(msg_id, LABEL_DONE)
+            # Supprimer de INBOX
+            imap.store(msg_id, "+FLAGS", "\\Deleted")
+
+    if not DRY_RUN:
+        imap.expunge()
+        state["processed"] = list(processed_ids | set(newly_processed))
+        save_state(state)
+
+    imap.logout()
+
+    summary = (
+        f"{total['emails']} emails traités — "
+        f"{total['paperless']} → Paperless, "
+        f"{total['immich']} → Immich, "
+        f"{total['skipped']} ignorés"
+    )
+    log.info(f"=== Terminé : {summary} ===")
+
+    if total["emails"] > 0:
+        notify(
+            "NAS-logo Gmail import",
+            summary,
+            "low" if not DRY_RUN else "default",
+        )
+
+if __name__ == "__main__":
+    main()
