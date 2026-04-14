@@ -1,0 +1,33 @@
+# docker-compose recherche NAS-logo — généré par Ansible
+
+name: recherche
+
+services:
+  meilisearch:
+    container_name: meilisearch
+    image: getmeili/meilisearch:latest
+    restart: always
+    ports:
+      - {{ meilisearch_port }}:7700
+    volumes:
+      - {{ meilisearch_data_dir }}/data:/meili_data
+    environment:
+      MEILI_MASTER_KEY: "{{ meilisearch_master_key }}"
+      MEILI_ENV: production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  search-ui:
+    container_name: search-ui
+    image: nginx:alpine
+    restart: always
+    ports:
+      - {{ meilisearch_ui_port }}:80
+    volumes:
+      - {{ meilisearch_data_dir }}/ui:/usr/share/nginx/html:ro
+    depends_on:
+      meilisearch:
+        condition: service_healthy

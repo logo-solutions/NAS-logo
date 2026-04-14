@@ -11,8 +11,17 @@
     - "{{ monitoring_data_dir }}/prometheus/rules"
     - "{{ monitoring_data_dir }}/grafana"
     - "{{ monitoring_data_dir }}/ntfy"
+    - "{{ monitoring_data_dir }}/alertmanager"
     - "{{ ansible_env.HOME }}/monitoring"
   tags: [monitoring]
+
+- name: "Déployer la configuration Alertmanager"
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ monitoring_data_dir }}/alertmanager/alertmanager.yml"
+    mode: "0640"
+  notify: restart monitoring
+  tags: [monitoring, prometheus]
 
 - name: "Déployer les alerting rules Prometheus"
   ansible.builtin.template:

@@ -1,0 +1,29 @@
+# alertmanager.yml — généré par Ansible (NAS-logo)
+
+global:
+  resolve_timeout: 5m
+
+time_intervals:
+  - name: journee
+    time_intervals:
+      - times:
+          - start_time: "07:00"
+            end_time: "21:00"
+        weekdays: ["monday:sunday"]
+
+route:
+  receiver: ntfy
+  group_by: [alertname]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  active_time_intervals:
+    - journee
+
+receivers:
+  - name: ntfy
+    webhook_configs:
+      - url: "http://ntfy:80/{{ ntfy_topic }}"
+        send_resolved: true
+        http_config:
+          follow_redirects: true

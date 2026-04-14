@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""NAS-logo — indexeur Meilisearch (Paperless + fichiers notes)"""
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+from urllib import request, error
+
+MEILI_URL   = "http://localhost:{{ meilisearch_port }}"
+MEILI_KEY   = "{{ meilisearch_master_key }}"
+PAPERLESS_URL   = "http://localhost:{{ paperless_port }}"
+PAPERLESS_TOKEN = "{{ paperless_api_token }}"
+FILES_DIR   = Path("{{ files_dir }}/notes")
+NAS_IP      = "{{ nas_ip }}"
+INDEX       = "nas-logo"
+
+
+def meili(method, path, data=None, ignore_errors=False):
+    url = f"{MEILI_URL}{path}"
+    headers = {
+        "Authorization": f"Bearer {MEILI_KEY}",
+        "Content-Type": "application/json",
+    }
+    body = json.dumps(data).encode() if data is not None else None
+    req = request.Request(url, data=body, headers=headers, method=method)
+    try:
+        with request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read())
+    except error.HTTPError as e:
+        if ignore_errors:
+            return {}
+        raise
+
+
+def http_get(url, headers):
+    req = request.Request(url, headers=headers)
+    with request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read())
+
+
+def setup_index():
+    meili("POST", "/indexes", {"uid": INDEX, "primaryKey": "id"}, ignore_errors=True)
+    meili("PATCH", f"/indexes/{INDEX}/settings", {
+        "searchableAttributes": ["title", "content", "tags_text"],
+        "filterableAttributes": ["type", "source"],
+        "sortableAttributes": ["date"],
+        "displayedAttributes": ["id", "type", "source", "title", "date", "url", "preview", "tags_text"],
+    })
+
+
+def push_batch(docs):
+    if not docs:
+        return
+    meili("POST", f"/indexes/{INDEX}/documents", docs)
+
+
+def index_paperless():
+    print("📄 Indexing Paperless...", flush=True)
+    docs = []
+    page = 1
+    headers = {"Authorization": f"Token {PAPERLESS_TOKEN}"}
+    while True:
+        data = http_get(
+            f"{PAPERLESS_URL}/api/documents/?page={page}&page_size=100",
+            headers,
+        )
+        for doc in data.get("results", []):
+            content = doc.get("content") or ""
+            docs.append({
+                "id": f"paperless-{doc['id']}",
+                "type": "document",
+                "source": "Paperless",
+                "title": doc.get("title", ""),
+                "content": content[:50000],
+                "preview": content[:300].strip(),
+                "date": doc.get("created_date", ""),
+                "tags_text": "",
+                "url": f"http://{NAS_IP}:{{ paperless_port }}/documents/{doc['id']}/details",
+            })
+        if not data.get("next"):
+            break
+        page += 1
+    push_batch(docs)
+    print(f"   ✓ {len(docs)} documents", flush=True)
+
+
+def index_files():
+    print("📝 Indexing notes...", flush=True)
+    if not FILES_DIR.exists():
+        print("   ⚠ Dossier notes/ absent, skip", flush=True)
+        return
+    docs = []
+    for f in FILES_DIR.rglob("*"):
+        if not f.is_file() or f.suffix.lower() not in {".md", ".txt"}:
+            continue
+        try:
+            content = f.read_text(errors="ignore")
+            relative = str(f.relative_to(FILES_DIR))
+            tags = list(f.relative_to(FILES_DIR).parts[:-1])
+            docs.append({
+                "id": f"file-{relative.replace('/', '__').replace('.', '_')}",
+                "type": "note",
+                "source": "Fichiers",
+                "title": f.stem,
+                "content": content[:50000],
+                "preview": content[:300].strip(),
+                "date": datetime.fromtimestamp(f.stat().st_mtime).strftime("%Y-%m-%d"),
+                "tags_text": " ".join(tags),
+                "url": f"smb://{NAS_IP}/nas-logo/notes/{relative}",
+            })
+        except Exception:
+            pass
+    push_batch(docs)
+    print(f"   ✓ {len(docs)} fichiers", flush=True)
+
+
+if __name__ == "__main__":
+    print(f"==> NAS-logo indexer — {datetime.now().strftime('%Y-%m-%d %H:%M')}", flush=True)
+    setup_index()
+    index_paperless()
+    index_files()
+    print("==> Terminé ✓", flush=True)

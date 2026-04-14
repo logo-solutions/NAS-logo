@@ -1,0 +1,4 @@
+---
+- name: restart smb
+  ansible.builtin.command: launchctl kickstart -k system/com.apple.smbd
+  become: true

@@ -1,0 +1,8 @@
+---
+- name: restart recherche
+  community.docker.docker_compose_v2:
+    project_src: "{{ ansible_env.HOME }}/recherche"
+    state: restarted
+    docker_cli: "{{ docker_bin }}"
+  environment:
+    DOCKER_HOST: "{{ docker_host }}"

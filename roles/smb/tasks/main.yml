@@ -1,0 +1,138 @@
+---
+# roles/smb — Partage SMB famille sur macOS
+
+# ── Groupe famille ─────────────────────────────────────────────────────────────
+
+- name: "Créer le groupe famille"
+  ansible.builtin.command: dseditgroup -o create -q famille
+  become: true
+  register: groupe_famille
+  changed_when: groupe_famille.rc == 0
+  failed_when: groupe_famille.rc not in [0, 1]
+  tags: [smb]
+
+- name: "Ajouter loic au groupe famille"
+  ansible.builtin.command: dseditgroup -o edit -a "{{ mac_user }}" -t user famille
+  become: true
+  changed_when: false
+  tags: [smb]
+
+# ── Comptes macOS alban + ilan ─────────────────────────────────────────────────
+
+- name: "Vérifier existence des utilisateurs"
+  ansible.builtin.command: "id {{ item.username }}"
+  loop: "{{ smb_users }}"
+  loop_control:
+    label: "{{ item.username }}"
+  register: user_check
+  changed_when: false
+  failed_when: false
+  tags: [smb]
+
+- name: "Créer les comptes macOS"
+  ansible.builtin.command: >
+    sysadminctl -addUser {{ item.item.username }}
+    -fullName "{{ item.item.fullname }}"
+    -password "{{ item.item.password }}"
+    -shell /bin/zsh
+  become: true
+  loop: "{{ user_check.results }}"
+  loop_control:
+    label: "{{ item.item.username }}"
+  when: item.rc != 0
+  tags: [smb]
+
+- name: "Ajouter les utilisateurs au groupe famille"
+  ansible.builtin.command: "dseditgroup -o edit -a {{ item.username }} -t user famille"
+  become: true
+  loop: "{{ smb_users }}"
+  loop_control:
+    label: "{{ item.username }}"
+  changed_when: false
+  tags: [smb]
+
+# ── Arborescence files/ ────────────────────────────────────────────────────────
+
+- name: "Créer les répertoires loic (accès privé)"
+  ansible.builtin.file:
+    path: "{{ files_dir }}/loic/{{ item }}"
+    state: directory
+    owner: "{{ mac_user }}"
+    group: staff
+    mode: "0700"
+  loop:
+    - ""
+    - pro
+    - immo
+    - formation
+    - administratif
+  become: true
+  tags: [smb]
+
+- name: "Créer les répertoires enfants"
+  ansible.builtin.file:
+    path: "{{ files_dir }}/enfants/{{ item.dir }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: famille
+    mode: "0770"
+  loop:
+    - { dir: "", owner: "root" }
+    - { dir: "alban", owner: "alban" }
+    - { dir: "ilan", owner: "ilan" }
+  become: true
+  tags: [smb]
+
+- name: "Créer le répertoire famille (accès commun)"
+  ansible.builtin.file:
+    path: "{{ files_dir }}/famille"
+    state: directory
+    owner: root
+    group: famille
+    mode: "0770"
+  become: true
+  tags: [smb]
+
+- name: "Permissions racine files/"
+  ansible.builtin.file:
+    path: "{{ files_dir }}"
+    state: directory
+    owner: root
+    group: famille
+    mode: "0750"
+  become: true
+  tags: [smb]
+
+# ── Partage SMB ────────────────────────────────────────────────────────────────
+
+- name: "Activer le service SMB"
+  ansible.builtin.command: launchctl load -w /System/Library/LaunchDaemons/com.apple.smbd.plist
+  become: true
+  register: smb_load
+  changed_when: smb_load.rc == 0
+  failed_when: smb_load.rc not in [0, 1]
+  tags: [smb]
+
+- name: "Vérifier si le partage SMB existe déjà"
+  ansible.builtin.command: sharing -l
+  register: sharing_list
+  changed_when: false
+  become: true
+  tags: [smb]
+
+- name: "Créer le partage SMB NAS-logo"
+  ansible.builtin.command: >
+    sharing -a "{{ smb_share_path }}"
+    -S "{{ smb_share_name }}"
+    -s 001
+    -g 000
+  become: true
+  when: smb_share_name not in sharing_list.stdout
+  tags: [smb]
+
+- name: "Activer le partage de fichiers macOS"
+  ansible.builtin.command: >
+    defaults write /Library/Preferences/SystemConfiguration/com.apple.smb.server
+    NetBIOSName -string "{{ smb_share_name }}"
+  become: true
+  tags: [smb]

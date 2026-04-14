@@ -25,3 +25,7 @@
       tags: [sauvegarde]
     - role: paperless
       tags: [paperless]
+    - role: recherche
+      tags: [recherche, meilisearch]
+    - role: smb
+      tags: [smb]

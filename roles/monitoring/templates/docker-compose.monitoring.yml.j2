@@ -74,6 +74,26 @@ services:
       retries: 3
     restart: always
 
+  alertmanager:
+    container_name: alertmanager
+    image: prom/alertmanager:latest
+    volumes:
+      - {{ monitoring_data_dir }}/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - {{ monitoring_data_dir }}/alertmanager:/alertmanager
+    ports:
+      - 9093:9093
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: always
+    depends_on:
+      - ntfy
+
   ntfy:
     container_name: ntfy
     image: binwiederhier/ntfy:latest

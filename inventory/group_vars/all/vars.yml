@@ -48,6 +48,42 @@ paperless_data_dir: "{{ ssd_mount_point }}/paperless"
 paperless_ocr_threshold: 20
 tesseract_bin: /opt/homebrew/bin/tesseract
 triage_bin: /usr/local/bin/nas-logo-triage.sh
+paperless_api_token: "{{ vault_paperless_api_token }}"
+paperless_users:
+  - username: alban
+    password: "{{ vault_paperless_alban_password }}"
+  - username: ilan
+    password: "{{ vault_paperless_ilan_password }}"
+
+# SMB
+smb_share_name: "NAS-logo"
+smb_share_path: "{{ files_dir }}"
+smb_alban_password: "{{ vault_smb_alban_password }}"
+smb_ilan_password: "{{ vault_smb_ilan_password }}"
+smb_users:
+  - username: alban
+    fullname: Alban
+    password: "{{ vault_smb_alban_password }}"
+  - username: ilan
+    fullname: Ilan
+    password: "{{ vault_smb_ilan_password }}"
+
+# Meilisearch
+meilisearch_port: 7700
+meilisearch_ui_port: 7701
+meilisearch_data_dir: "{{ ssd_mount_point }}/meilisearch"
+meilisearch_master_key: "{{ vault_meilisearch_master_key }}"
+files_dir: "{{ ssd_mount_point }}/files"
+nas_ip: "100.113.214.55"
+
+# Immich — comptes famille
+immich_users:
+  - email: "alban@nas.local"
+    name: "Alban"
+    password: "{{ vault_immich_alban_password }}"
+  - email: "ilan@nas.local"
+    name: "Ilan"
+    password: "{{ vault_immich_ilan_password }}"
 
 # Docker (Colima sur Apple Silicon)
 docker_bin: /opt/homebrew/bin/docker
