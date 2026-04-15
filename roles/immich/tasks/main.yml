@@ -57,6 +57,8 @@
       x-api-key: "{{ immich_api_key }}"
     return_content: true
   register: immich_existing_users
+  check_mode: false
+  failed_when: false
   tags: [immich]
 
 - name: "Créer les comptes Immich manquants"
@@ -75,7 +77,9 @@
   loop: "{{ immich_users }}"
   loop_control:
     label: "{{ item.email }}"
-  when: item.email not in (immich_existing_users.json | map(attribute='email') | list)
+  when:
+    - immich_existing_users.status | default(-1) == 200
+    - item.email not in (immich_existing_users.json | default([]) | map(attribute='email') | list)
   changed_when: true
   tags: [immich]
 
@@ -89,14 +93,17 @@
       x-api-key: "{{ immich_api_key }}"
     return_content: true
   register: immich_all_users
+  check_mode: false
+  failed_when: false
   tags: [immich]
 
 - name: "Construire la liste des userId famille"
   ansible.builtin.set_fact:
     famille_album_users: "{{ famille_album_users | default([]) + [{'userId': item.id, 'role': 'editor'}] }}"
-  loop: "{{ immich_all_users.json | selectattr('email', 'in', immich_users | map(attribute='email') | list) | list }}"
+  loop: "{{ immich_all_users.json | default([]) | selectattr('email', 'in', immich_users | map(attribute='email') | list) | list }}"
   loop_control:
     label: "{{ item.email }}"
+  when: immich_all_users.status | default(-1) == 200
   tags: [immich]
 
 - name: "Lister les albums Immich"
@@ -107,6 +114,8 @@
       x-api-key: "{{ immich_api_key }}"
     return_content: true
   register: immich_all_albums
+  check_mode: false
+  failed_when: false
   tags: [immich]
 
 - name: "Créer l'album Famille"
@@ -120,7 +129,9 @@
     body:
       albumName: "Famille"
     status_code: [200, 201]
-  when: '"Famille" not in (immich_all_albums.json | map(attribute="albumName") | list)'
+  when:
+    - immich_all_albums.status | default(-1) == 200
+    - '"Famille" not in (immich_all_albums.json | default([]) | map(attribute="albumName") | list)'
   register: immich_famille_created
   changed_when: true
   tags: [immich]
@@ -128,9 +139,10 @@
 - name: "Récupérer l'ID de l'album Famille"
   ansible.builtin.set_fact:
     famille_album_id: >-
-      {{ (immich_all_albums.json | selectattr('albumName', 'equalto', 'Famille') | list | first).id
-         if 'Famille' in (immich_all_albums.json | map(attribute='albumName') | list)
-         else immich_famille_created.json.id }}
+      {{ (immich_all_albums.json | default([]) | selectattr('albumName', 'equalto', 'Famille') | list | first).id
+         if 'Famille' in (immich_all_albums.json | default([]) | map(attribute='albumName') | list)
+         else (immich_famille_created.json.id | default('')) }}
+  when: immich_all_albums.status | default(-1) == 200
   tags: [immich]
 
 - name: "Partager l'album Famille avec alban et ilan"
@@ -144,6 +156,8 @@
     body:
       albumUsers: "{{ famille_album_users | default([]) }}"
     status_code: [200, 201]
-  when: famille_album_users | default([]) | length > 0
+  when:
+    - immich_all_albums.status | default(-1) == 200
+    - famille_album_users | default([]) | length > 0
   changed_when: false
   tags: [immich]
