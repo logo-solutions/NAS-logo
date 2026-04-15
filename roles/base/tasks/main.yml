@@ -1,5 +1,5 @@
 ---
-# roles/base — Homebrew packages et collections Ansible
+# roles/base — Homebrew packages, collections Ansible, scripts et alias shell
 
 - name: "Installer les packages Homebrew essentiels"
   community.general.homebrew:
@@ -16,3 +16,26 @@
     name: ansible-lint
     state: present
   tags: [base]
+
+- name: "Installer les collections Ansible requises"
+  ansible.builtin.command:
+    cmd: ansible-galaxy collection install {{ item }} --upgrade
+  loop: "{{ ansible_collections }}"
+  changed_when: false
+  tags: [base]
+
+- name: "Déployer le script import-takeout"
+  ansible.builtin.template:
+    src: import-takeout.sh.j2
+    dest: "{{ ansible_env.HOME }}/nas-logo-import-takeout.sh"
+    mode: "0755"
+  tags: [base, shell]
+
+- name: "Ajouter les alias NAS-logo dans .zshrc"
+  ansible.builtin.blockinfile:
+    path: "{{ ansible_env.HOME }}/.zshrc"
+    marker: "# {mark} NAS-logo aliases"
+    block: |
+      alias nas="cd /Volumes/logousb/SSD/Projects/NAS-logo && claude"
+      alias nas-import="{{ ansible_env.HOME }}/nas-logo-import-takeout.sh"
+  tags: [base, shell]

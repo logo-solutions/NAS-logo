@@ -1,0 +1,10 @@
+---
+# roles/personnes — arborescence par personne (imports, paperless, files)
+
+- name: "Créer l'arborescence pour chaque personne"
+  ansible.builtin.file:
+    path: "{{ ssd_mount_point }}/personnes/{{ item.0 }}/{{ item.1 }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ personnes | product(['imports', 'paperless', 'files']) | list }}"
+  tags: [personnes]

@@ -1,0 +1,69 @@
+#!/bin/bash
+# import-takeout.sh — importe Google Takeout dans Immich en arrière-plan
+# Usage: ./import-takeout.sh [host] [source_dir]
+#   host       : ex. localhost ou 192.168.1.10 (défaut: localhost)
+#   source_dir : répertoire ou archive .zip à importer (défaut: {{ ssd_mount_point }}/imports)
+
+HOST="${1:-localhost}"
+SOURCE="${2:-{{ ssd_mount_point }}/imports}"
+
+LOG_FILE="/tmp/nas-logo-import-takeout.log"
+NTFY_URL="http://${HOST}:{{ ntfy_port }}/{{ ntfy_topic }}"
+IMMICH_URL="http://${HOST}:{{ immich_port }}"
+IMMICH_KEY="{{ vault_immich_api_key }}"
+export PATH="/opt/homebrew/bin:$PATH"
+
+notify() {
+  curl -s -H "Title: $1" -H "Priority: $2" -d "$3" "$NTFY_URL" || true
+}
+
+echo "==> Import Takeout démarré ($(date))" | tee "$LOG_FILE"
+echo "==> Host: $HOST | Source: $SOURCE" | tee -a "$LOG_FILE"
+notify "NAS-logo Import" "default" "Import Google Takeout démarré — $(date)"
+
+# Si la source est un .zip, on le décompresse d'abord
+IMPORT_DIR="$SOURCE"
+if [[ "$SOURCE" == *.zip ]]; then
+  EXTRACT_DIR="${SOURCE%.zip}_extracted"
+  if [ ! -d "$EXTRACT_DIR" ]; then
+    echo "==> Décompression de $SOURCE..." | tee -a "$LOG_FILE"
+    unzip -q "$SOURCE" -d "$EXTRACT_DIR" 2>&1 | tee -a "$LOG_FILE"
+    if [ $? -ne 0 ]; then
+      echo "==> Erreur lors de la décompression" | tee -a "$LOG_FILE"
+      notify "NAS-logo Import ERREUR" "urgent" "Échec décompression de $SOURCE"
+      exit 1
+    fi
+  else
+    echo "==> Dossier extrait existant, on l'utilise : $EXTRACT_DIR" | tee -a "$LOG_FILE"
+  fi
+  IMPORT_DIR="$EXTRACT_DIR"
+fi
+
+# Si le répertoire contient des .zip, on les décompresse tous
+if [ -d "$IMPORT_DIR" ]; then
+  for zip in "$IMPORT_DIR"/*.zip; do
+    [ -f "$zip" ] || continue
+    DEST="${zip%.zip}_extracted"
+    if [ ! -d "$DEST" ]; then
+      echo "==> Décompression de $zip..." | tee -a "$LOG_FILE"
+      unzip -q "$zip" -d "$DEST" 2>&1 | tee -a "$LOG_FILE"
+    fi
+  done
+fi
+
+IMMICH_INSTANCE_URL="$IMMICH_URL" IMMICH_API_KEY="$IMMICH_KEY" \
+  npx --yes @immich/cli@latest upload \
+    --recursive \
+    --album \
+    "$IMPORT_DIR" \
+    2>&1 | tee -a "$LOG_FILE"
+
+EXIT_CODE=${PIPESTATUS[0]}
+
+if [ "$EXIT_CODE" -eq 0 ]; then
+  echo "==> Import terminé avec succès ($(date))" | tee -a "$LOG_FILE"
+  notify "NAS-logo Import OK" "low" "Import Google Takeout terminé. Voir $LOG_FILE."
+else
+  echo "==> Import terminé avec des erreurs (code $EXIT_CODE)" | tee -a "$LOG_FILE"
+  notify "NAS-logo Import ERREUR" "urgent" "Import terminé avec erreurs (code $EXIT_CODE). Voir $LOG_FILE."
+fi

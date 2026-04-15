@@ -19,6 +19,8 @@
       tags: [docker]
     - role: immich
       tags: [immich]
+    - role: personnes
+      tags: [personnes]
     - role: monitoring
       tags: [monitoring, prometheus, grafana]
     - role: sauvegarde

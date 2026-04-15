@@ -91,3 +91,23 @@ gmail_user: "{{ vault_gmail_user }}"
 # Docker (Colima sur Apple Silicon)
 docker_bin: /opt/homebrew/bin/docker
 docker_host: "unix:///Users/{{ ansible_user_id }}/.colima/default/docker.sock"
+
+# Personnes — arbo par personne : imports/ paperless/ files/
+personnes:
+  - alice
+  - loic-administratif
+  - loic-formation
+  - loic-pro
+  - loic-immo
+  - alo
+  - alban
+  - mahaut
+  - ilan
+  - famille-gourmelon
+  - famille-vasseur
+
+# Ansible collections requises
+ansible_collections:
+  - community.general
+  - community.docker
+  - ansible.posix
