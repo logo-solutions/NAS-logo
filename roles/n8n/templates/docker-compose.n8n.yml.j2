@@ -23,6 +23,7 @@ services:
       N8N_BASIC_AUTH_USER: "{{ n8n_user }}"
       N8N_BASIC_AUTH_PASSWORD: "{{ vault_n8n_password }}"
       N8N_ENCRYPTION_KEY: "{{ vault_n8n_encryption_key }}"
+      N8N_SECURE_COOKIE: "false"
       N8N_LOG_LEVEL: "warn"
       EXECUTIONS_DATA_PRUNE: "true"
       EXECUTIONS_DATA_MAX_AGE: "336"
