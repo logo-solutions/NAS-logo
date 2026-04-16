@@ -7,3 +7,10 @@
   environment:
     DOCKER_HOST: "{{ docker_host }}"
   when: not ansible_check_mode
+
+- name: restart fswatch-triage
+  ansible.builtin.shell: |
+    launchctl unload "{{ ansible_env.HOME }}/Library/LaunchAgents/com.nas-logo.fswatch-triage.plist" 2>/dev/null || true
+    launchctl load -w "{{ ansible_env.HOME }}/Library/LaunchAgents/com.nas-logo.fswatch-triage.plist"
+  changed_when: true
+  when: not ansible_check_mode

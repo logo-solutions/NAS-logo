@@ -4,24 +4,20 @@
   "nodes": [
     {
       "parameters": {
-        "path": "/data/personnes",
-        "events": ["add"],
-        "options": {
-          "depth": 2,
-          "ignored": ".*",
-          "usePolling": true,
-          "pollingInterval": 3000
-        }
+        "httpMethod": "POST",
+        "path": "triage",
+        "options": {}
       },
       "id": "a1b2c3d4-0001-0001-0001-000000000001",
-      "name": "Nouveaux fichiers",
-      "type": "n8n-nodes-base.localFileTrigger",
-      "typeVersion": 1,
-      "position": [240, 300]
+      "name": "Webhook triage",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "triage-webhook-001"
     },
     {
       "parameters": {
-        "jsCode": "const p = $input.first().json.path;\nconst hostPath = p.replace('/data/personnes', '{% endraw %}{{ ssd_mount_point }}{% raw %}/personnes');\nconst parts = p.split('/');\nconst personne = parts[3] || 'inconnu';\nconst fichier = parts[parts.length - 1];\nreturn [{ json: { hostPath, personne, fichier } }];"
+        "jsCode": "const hostPath = $input.first().json.body?.path || $input.first().json.path;\nconst parts = hostPath.split('/');\nconst personne = parts[parts.indexOf('personnes') + 1] || 'inconnu';\nconst fichier = parts[parts.length - 1];\nreturn [{ json: { hostPath, personne, fichier } }];"
       },
       "id": "a1b2c3d4-0001-0001-0001-000000000002",
       "name": "Préparer chemin",
@@ -63,7 +59,7 @@
         },
         "sendBody": true,
         "specifyBody": "string",
-        "body": "={{ $json.stdout.trim() || 'OK' }}"
+        "body": "={{ $json.stdout?.trim() || $('Préparer chemin').item.json.fichier }}"
       },
       "id": "a1b2c3d4-0001-0001-0001-000000000004",
       "name": "Notif ntfy",
@@ -73,7 +69,7 @@
     }
   ],
   "connections": {
-    "Nouveaux fichiers": {
+    "Webhook triage": {
       "main": [[{"node": "Préparer chemin", "type": "main", "index": 0}]]
     },
     "Préparer chemin": {
@@ -83,7 +79,7 @@
       "main": [[{"node": "Notif ntfy", "type": "main", "index": 0}]]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },

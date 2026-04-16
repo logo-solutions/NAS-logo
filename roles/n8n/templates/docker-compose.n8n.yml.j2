@@ -11,7 +11,7 @@ services:
     ports:
       - {{ n8n_port }}:5678
     volumes:
-      - {{ n8n_data_dir }}/data:/home/node/.n8n
+      - n8n_data:/home/node/.n8n
       - {{ ssd_mount_point }}/personnes:/data/personnes:ro
     environment:
       N8N_HOST: "0.0.0.0"
@@ -35,3 +35,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+
+volumes:
+  n8n_data:

@@ -1,0 +1,23 @@
+#!/bin/bash
+# Surveille le dossier personnes et déclenche le triage à chaque nouveau fichier
+
+/opt/homebrew/bin/fswatch \
+  --event Created \
+  --recursive \
+  --exclude '/\.' \
+  "{{ ssd_mount_point }}/personnes" \
+| while read -r filepath; do
+    [[ -f "$filepath" ]] || continue
+
+    personne=$(echo "$filepath" | awk -F'/' '{for(i=1;i<=NF;i++) if($i=="personnes") print $(i+1)}')
+    fichier=$(basename "$filepath")
+
+    result=$(/usr/local/bin/nas-logo-triage.sh "$filepath" 2>&1) || true
+
+    curl -s -X POST \
+      -H "Title: Triage ✓ ${personne}" \
+      -H "Tags: file_folder" \
+      -d "${result:-$fichier}" \
+      "http://localhost:{{ ntfy_port }}/{{ ntfy_topic }}" \
+      > /dev/null
+  done
