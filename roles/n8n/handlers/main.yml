@@ -1,0 +1,9 @@
+---
+- name: restart n8n
+  community.docker.docker_compose_v2:
+    project_src: "{{ ansible_env.HOME }}/n8n"
+    state: restarted
+    docker_cli: "{{ docker_bin }}"
+  environment:
+    DOCKER_HOST: "{{ docker_host }}"
+  when: not ansible_check_mode

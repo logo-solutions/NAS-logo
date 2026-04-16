@@ -1,0 +1,34 @@
+# docker-compose n8n NAS-logo — généré par Ansible
+
+name: n8n
+
+services:
+  n8n:
+    container_name: n8n
+    image: n8nio/n8n:latest
+    platform: linux/arm64
+    restart: always
+    ports:
+      - {{ n8n_port }}:5678
+    volumes:
+      - {{ n8n_data_dir }}/data:/home/node/.n8n
+    environment:
+      N8N_HOST: "0.0.0.0"
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: "http"
+      WEBHOOK_URL: "http://{{ nas_ip }}:{{ n8n_port }}/"
+      GENERIC_TIMEZONE: "Europe/Paris"
+      TZ: "Europe/Paris"
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: "{{ n8n_user }}"
+      N8N_BASIC_AUTH_PASSWORD: "{{ vault_n8n_password }}"
+      N8N_ENCRYPTION_KEY: "{{ vault_n8n_encryption_key }}"
+      N8N_LOG_LEVEL: "warn"
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: "336"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s

@@ -1,0 +1,48 @@
+---
+# roles/n8n — Automatisation de workflows
+
+- name: "Créer le répertoire n8n sur le SSD"
+  ansible.builtin.file:
+    path: "{{ n8n_data_dir }}/data"
+    state: directory
+    mode: "0750"
+  tags: [n8n]
+
+- name: "Créer le répertoire de déploiement n8n"
+  ansible.builtin.file:
+    path: "{{ ansible_env.HOME }}/n8n"
+    state: directory
+    mode: "0750"
+  tags: [n8n]
+
+- name: "Déployer docker-compose.n8n.yml"
+  ansible.builtin.template:
+    src: docker-compose.n8n.yml.j2
+    dest: "{{ ansible_env.HOME }}/n8n/docker-compose.yml"
+    mode: "0640"
+  notify: restart n8n
+  tags: [n8n]
+
+- name: "Démarrer la stack n8n"
+  community.docker.docker_compose_v2:
+    project_src: "{{ ansible_env.HOME }}/n8n"
+    state: present
+    pull: always
+    docker_cli: "{{ docker_bin }}"
+  environment:
+    DOCKER_HOST: "{{ docker_host }}"
+  when: not ansible_check_mode
+  tags: [n8n]
+
+- name: "Attendre que n8n soit prêt"
+  ansible.builtin.uri:
+    url: "http://localhost:{{ n8n_port }}/healthz"
+    method: GET
+    status_code: 200
+    timeout: 10
+  retries: 12
+  delay: 10
+  register: n8n_health
+  until: n8n_health.status == 200
+  when: not ansible_check_mode
+  tags: [n8n]

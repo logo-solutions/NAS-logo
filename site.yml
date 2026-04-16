@@ -33,3 +33,5 @@
       tags: [smb]
     - role: gmail
       tags: [gmail]
+    - role: n8n
+      tags: [n8n]
