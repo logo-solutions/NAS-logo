@@ -63,3 +63,44 @@
   when: not ansible_check_mode
   changed_when: true
   tags: [n8n]
+
+- name: "Vérifier si les credentials SSH ont déjà été importés"
+  ansible.builtin.stat:
+    path: "{{ n8n_data_dir }}/.credentials_imported"
+  register: credentials_marker
+  tags: [n8n]
+
+- name: "Préparer les credentials SSH n8n (temporaire)"
+  ansible.builtin.template:
+    src: credentials-ssh.json.j2
+    dest: "{{ n8n_data_dir }}/data/credentials-ssh.json"
+    mode: "0600"
+  no_log: true
+  when: not credentials_marker.stat.exists and not ansible_check_mode
+  tags: [n8n]
+
+- name: "Importer les credentials SSH dans n8n"
+  ansible.builtin.shell: >
+    {{ docker_bin }} exec n8n
+    n8n import:credentials --input=/home/node/.n8n/credentials-ssh.json
+  environment:
+    DOCKER_HOST: "{{ docker_host }}"
+  when: not credentials_marker.stat.exists and not ansible_check_mode
+  changed_when: true
+  no_log: true
+  tags: [n8n]
+
+- name: "Supprimer le fichier credentials (sécurité)"
+  ansible.builtin.file:
+    path: "{{ n8n_data_dir }}/data/credentials-ssh.json"
+    state: absent
+  when: not ansible_check_mode
+  tags: [n8n]
+
+- name: "Marquer les credentials SSH comme importés"
+  ansible.builtin.file:
+    path: "{{ n8n_data_dir }}/.credentials_imported"
+    state: touch
+    mode: "0600"
+  when: not credentials_marker.stat.exists and not ansible_check_mode
+  tags: [n8n]
