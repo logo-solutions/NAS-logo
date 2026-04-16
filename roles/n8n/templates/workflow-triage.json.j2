@@ -1,0 +1,92 @@
+{% raw %}{
+  "id": "triage-imports-001",
+  "name": "Triage fichiers imports",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "/data/personnes",
+        "events": ["add"],
+        "options": {
+          "depth": 2,
+          "ignored": ".*",
+          "usePolling": true,
+          "pollingInterval": 3000
+        }
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "Nouveaux fichiers",
+      "type": "n8n-nodes-base.localFileTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $input.first().json.path;\nconst hostPath = p.replace('/data/personnes', '{% endraw %}{{ ssd_mount_point }}{% raw %}/personnes');\nconst parts = p.split('/');\nconst personne = parts[3] || 'inconnu';\nconst fichier = parts[parts.length - 1];\nreturn [{ json: { hostPath, personne, fichier } }];"
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000002",
+      "name": "Préparer chemin",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "command": "=/usr/local/bin/nas-logo-triage.sh \"{{ $json.hostPath }}\""
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000003",
+      "name": "Triage",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "credentials": {
+        "sshPassword": {
+          "id": "1",
+          "name": "NAS-logo SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "{% endraw %}http://{{ nas_ip }}:{{ ntfy_port }}/{{ ntfy_topic }}{% raw %}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Title",
+              "value": "=Triage \u2713 {{ $('Préparer chemin').item.json.personne }}"
+            },
+            {
+              "name": "Tags",
+              "value": "file_folder"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ $json.stdout.trim() || 'OK' }}"
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000004",
+      "name": "Notif ntfy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Nouveaux fichiers": {
+      "main": [[{"node": "Préparer chemin", "type": "main", "index": 0}]]
+    },
+    "Préparer chemin": {
+      "main": [[{"node": "Triage", "type": "main", "index": 0}]]
+    },
+    "Triage": {
+      "main": [[{"node": "Notif ntfy", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
+{% endraw %}

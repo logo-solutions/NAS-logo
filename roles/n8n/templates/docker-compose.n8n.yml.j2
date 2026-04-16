@@ -12,6 +12,7 @@ services:
       - {{ n8n_port }}:5678
     volumes:
       - {{ n8n_data_dir }}/data:/home/node/.n8n
+      - {{ ssd_mount_point }}/personnes:/data/personnes:ro
     environment:
       N8N_HOST: "0.0.0.0"
       N8N_PORT: "5678"

@@ -34,6 +34,13 @@
   when: not ansible_check_mode
   tags: [n8n]
 
+- name: "Déployer le workflow triage"
+  ansible.builtin.template:
+    src: workflow-triage.json.j2
+    dest: "{{ n8n_data_dir }}/data/workflow-triage.json"
+    mode: "0640"
+  tags: [n8n]
+
 - name: "Attendre que n8n soit prêt"
   ansible.builtin.uri:
     url: "http://localhost:{{ n8n_port }}/healthz"
@@ -45,4 +52,14 @@
   register: n8n_health
   until: n8n_health.status == 200
   when: not ansible_check_mode
+  tags: [n8n]
+
+- name: "Importer le workflow triage dans n8n"
+  ansible.builtin.shell: >
+    {{ docker_bin }} exec n8n
+    n8n import:workflow --input=/home/node/.n8n/workflow-triage.json
+  environment:
+    DOCKER_HOST: "{{ docker_host }}"
+  when: not ansible_check_mode
+  changed_when: true
   tags: [n8n]
