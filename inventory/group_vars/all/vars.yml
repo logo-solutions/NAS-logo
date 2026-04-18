@@ -22,6 +22,8 @@ grafana_port: 3000
 prometheus_port: 9090
 cadvisor_port: 8080
 ntfy_port: 8090
+ntfy_https_port: 8453
+ntfy_certs_dir: "{{ monitoring_data_dir }}/ntfy-certs"
 ntfy_topic: nas-logo
 alert_disk_threshold: 80
 grafana_dashboard_cadvisor_id: 14282

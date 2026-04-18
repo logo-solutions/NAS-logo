@@ -6,7 +6,7 @@ services:
   paperless-redis:
     container_name: paperless_redis
     image: redis:7-alpine
-    restart: always
+    restart: unless-stopped
     volumes:
       - {{ paperless_data_dir }}/redis:/data
     healthcheck:
@@ -18,7 +18,7 @@ services:
   paperless:
     container_name: paperless
     image: ghcr.io/paperless-ngx/paperless-ngx:latest
-    restart: always
+    restart: unless-stopped
     depends_on:
       paperless-redis:
         condition: service_healthy

@@ -20,7 +20,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-    restart: always
+    restart: unless-stopped
 
   grafana:
     container_name: grafana
@@ -38,7 +38,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-    restart: always
+    restart: unless-stopped
     depends_on:
       - prometheus
 
@@ -56,7 +56,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-    restart: always
+    restart: unless-stopped
 
   node-exporter:
     container_name: node_exporter
@@ -73,7 +73,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-    restart: always
+    restart: unless-stopped
 
   alertmanager:
     container_name: alertmanager
@@ -91,7 +91,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-    restart: always
+    restart: unless-stopped
     depends_on:
       - ntfy
 
@@ -99,13 +99,20 @@ services:
     container_name: ntfy
     image: binwiederhier/ntfy:latest
     command: serve
+    environment:
+      NTFY_BASE_URL: "https://{{ tailscale_fqdn }}:{{ ntfy_https_port }}"
+      NTFY_LISTEN_HTTPS: ":443"
+      NTFY_KEY_FILE: /etc/ntfy/key.pem
+      NTFY_CERT_FILE: /etc/ntfy/cert.pem
     volumes:
       - {{ monitoring_data_dir }}/ntfy:/var/lib/ntfy
+      - {{ ntfy_certs_dir }}:/etc/ntfy:ro
     ports:
       - "0.0.0.0:{{ ntfy_port }}:80"
+      - "0.0.0.0:{{ ntfy_https_port }}:443"
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/v1/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-    restart: always
+    restart: unless-stopped

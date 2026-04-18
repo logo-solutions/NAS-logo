@@ -43,7 +43,7 @@
     },
     {
       "parameters": {
-        "url": "{% endraw %}http://{{ nas_ip }}:{{ ntfy_port }}/{{ ntfy_topic }}{% raw %}",
+        "url": "{% endraw %}http://host.docker.internal:{{ ntfy_port }}/{{ ntfy_topic }}{% raw %}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

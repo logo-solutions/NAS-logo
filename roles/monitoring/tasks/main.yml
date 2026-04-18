@@ -11,9 +11,32 @@
     - "{{ monitoring_data_dir }}/prometheus/rules"
     - "{{ monitoring_data_dir }}/grafana"
     - "{{ monitoring_data_dir }}/ntfy"
+    - "{{ monitoring_data_dir }}/ntfy-certs"
     - "{{ monitoring_data_dir }}/alertmanager"
     - "{{ ansible_env.HOME }}/monitoring"
   tags: [monitoring]
+
+- name: "Récupérer le FQDN Tailscale pour le certificat ntfy"
+  ansible.builtin.command:
+    cmd: tailscale status --json
+  register: ts_status_json
+  changed_when: false
+  tags: [monitoring, ntfy]
+
+- name: "Extraire le FQDN Tailscale"
+  ansible.builtin.set_fact:
+    tailscale_fqdn: "{{ (ts_status_json.stdout | from_json)['Self']['DNSName'] | regex_replace('\\.$', '') }}"
+  tags: [monitoring, ntfy]
+
+- name: "Obtenir le certificat TLS Tailscale pour ntfy"
+  ansible.builtin.command:
+    cmd: >
+      tailscale cert
+      --cert-file {{ ntfy_certs_dir }}/cert.pem
+      --key-file {{ ntfy_certs_dir }}/key.pem
+      {{ tailscale_fqdn }}
+  changed_when: true
+  tags: [monitoring, ntfy]
 
 - name: "Déployer la configuration Alertmanager"
   ansible.builtin.template:

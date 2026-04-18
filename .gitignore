@@ -10,3 +10,6 @@ inventory/group_vars/**/vault.yml
 # Fichiers générés
 *.retry
 *.log
+
+# Récapitulatif URLs/mots de passe en clair
+url_readme.md

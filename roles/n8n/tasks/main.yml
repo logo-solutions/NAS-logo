@@ -88,6 +88,45 @@
   when: not credentials_marker.stat.exists and not ansible_check_mode
   tags: [n8n]
 
+- name: "Vérifier si le workflow triage a été importé"
+  ansible.builtin.stat:
+    path: "{{ n8n_data_dir }}/.workflow_triage_imported"
+  register: workflow_triage_marker
+  tags: [n8n]
+
+- name: "Préparer le workflow triage (temporaire)"
+  ansible.builtin.template:
+    src: workflow-triage.json.j2
+    dest: "{{ n8n_data_dir }}/data/workflow-triage.json"
+    mode: "0600"
+  when: not workflow_triage_marker.stat.exists and not ansible_check_mode
+  tags: [n8n]
+
+- name: "Importer le workflow triage dans n8n"
+  ansible.builtin.shell: >
+    {{ docker_bin }} exec n8n
+    n8n import:workflow --input=/home/node/.n8n/workflow-triage.json
+  environment:
+    DOCKER_HOST: "{{ docker_host }}"
+  when: not workflow_triage_marker.stat.exists and not ansible_check_mode
+  changed_when: true
+  tags: [n8n]
+
+- name: "Supprimer le fichier workflow temporaire"
+  ansible.builtin.file:
+    path: "{{ n8n_data_dir }}/data/workflow-triage.json"
+    state: absent
+  when: not ansible_check_mode
+  tags: [n8n]
+
+- name: "Marquer le workflow triage comme importé"
+  ansible.builtin.file:
+    path: "{{ n8n_data_dir }}/.workflow_triage_imported"
+    state: touch
+    mode: "0600"
+  when: not workflow_triage_marker.stat.exists and not ansible_check_mode
+  tags: [n8n]
+
 - name: "Installer fswatch via Homebrew"
   community.general.homebrew:
     name: fswatch

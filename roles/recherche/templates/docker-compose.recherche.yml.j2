@@ -6,7 +6,7 @@ services:
   meilisearch:
     container_name: meilisearch
     image: getmeili/meilisearch:latest
-    restart: always
+    restart: unless-stopped
     ports:
       - {{ meilisearch_port }}:7700
     volumes:
@@ -23,7 +23,7 @@ services:
   search-ui:
     container_name: search-ui
     image: nginx:alpine
-    restart: always
+    restart: unless-stopped
     ports:
       - {{ meilisearch_ui_port }}:80
     volumes:
