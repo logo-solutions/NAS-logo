@@ -64,11 +64,17 @@
   tags: [n8n]
 
 - name: "Importer les credentials SSH dans n8n"
-  ansible.builtin.shell: >
-    {{ docker_bin }} exec n8n
-    n8n import:credentials --input=/home/node/.n8n/credentials-ssh.json
+  ansible.builtin.shell: |
+    {{ docker_bin }} stop n8n
+    {{ docker_bin }} run --rm \
+      -v {{ n8n_data_dir }}/data:/home/node/.n8n \
+      --entrypoint n8n \
+      -e N8N_ENCRYPTION_KEY="{{ vault_n8n_encryption_key }}" \
+      n8nio/n8n:latest import:credentials --input=/home/node/.n8n/credentials-ssh.json
+    {{ docker_bin }} start n8n
   environment:
     DOCKER_HOST: "{{ docker_host }}"
+    PATH: "/Applications/Docker.app/Contents/Resources/bin:{{ ansible_env.PATH }}"
   when: not credentials_marker.stat.exists and not ansible_check_mode
   changed_when: true
   no_log: true
