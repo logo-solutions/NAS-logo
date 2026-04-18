@@ -7,7 +7,7 @@ services:
     container_name: n8n
     image: n8nio/n8n:latest
     platform: linux/arm64
-    restart: always
+    restart: unless-stopped
     ports:
       - {{ n8n_port }}:5678
     volumes:
