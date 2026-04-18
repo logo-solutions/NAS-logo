@@ -90,9 +90,9 @@ immich_users:
 # Gmail → Paperless / Immich
 gmail_user: "{{ vault_gmail_user }}"
 
-# Docker (Colima sur Apple Silicon)
-docker_bin: /opt/homebrew/bin/docker
-docker_host: "unix:///Users/{{ ansible_user_id }}/.colima/default/docker.sock"
+# Docker Desktop (Apple Silicon)
+docker_bin: /Applications/Docker.app/Contents/Resources/bin/docker
+docker_host: "unix:///Users/{{ ansible_user_id }}/.docker/run/docker.sock"
 
 # Personnes — arbo par personne : imports/ paperless/ files/
 personnes:

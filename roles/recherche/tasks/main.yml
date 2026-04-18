@@ -32,10 +32,11 @@
   community.docker.docker_compose_v2:
     project_src: "{{ ansible_env.HOME }}/recherche"
     state: present
-    pull: always
+    pull: missing
     docker_cli: "{{ docker_bin }}"
   environment:
     DOCKER_HOST: "{{ docker_host }}"
+    PATH: "/Applications/Docker.app/Contents/Resources/bin:{{ ansible_env.PATH }}"
   tags: [recherche]
 
 - name: "Déployer l'indexeur NAS-logo"
