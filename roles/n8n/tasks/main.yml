@@ -27,10 +27,11 @@
   community.docker.docker_compose_v2:
     project_src: "{{ ansible_env.HOME }}/n8n"
     state: present
-    pull: always
+    pull: missing
     docker_cli: "{{ docker_bin }}"
   environment:
     DOCKER_HOST: "{{ docker_host }}"
+    PATH: "/Applications/Docker.app/Contents/Resources/bin:{{ ansible_env.PATH }}"
   when: not ansible_check_mode
   tags: [n8n]
 
@@ -102,10 +103,20 @@
   when: not workflow_triage_marker.stat.exists and not ansible_check_mode
   tags: [n8n]
 
+- name: "Copier le workflow triage dans le container"
+  ansible.builtin.shell: >
+    {{ docker_bin }} cp {{ n8n_data_dir }}/data/workflow-triage.json n8n:/home/node/workflow-triage.json &&
+    {{ docker_bin }} exec --user root n8n chmod 644 /home/node/workflow-triage.json
+  environment:
+    DOCKER_HOST: "{{ docker_host }}"
+  when: not workflow_triage_marker.stat.exists and not ansible_check_mode
+  changed_when: true
+  tags: [n8n]
+
 - name: "Importer le workflow triage dans n8n"
   ansible.builtin.shell: >
     {{ docker_bin }} exec n8n
-    n8n import:workflow --input=/home/node/.n8n/workflow-triage.json
+    n8n import:workflow --input=/home/node/workflow-triage.json
   environment:
     DOCKER_HOST: "{{ docker_host }}"
   when: not workflow_triage_marker.stat.exists and not ansible_check_mode
