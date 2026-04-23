@@ -23,6 +23,7 @@
     /usr/local/bin/tailscale up
     --authkey="{{ vault_tailscale_authkey }}"
     --hostname="{{ tailscale_hostname }}"
+    --advertise-tags="{{ tailscale_tags }}"
     --accept-dns=false
     --reset
   when: >

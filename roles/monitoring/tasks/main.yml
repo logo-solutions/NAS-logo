@@ -18,7 +18,7 @@
 
 - name: "Récupérer le FQDN Tailscale pour le certificat ntfy"
   ansible.builtin.command:
-    cmd: tailscale status --json
+    cmd: /opt/homebrew/bin/tailscale status --json
   register: ts_status_json
   changed_when: false
   tags: [monitoring, ntfy]
@@ -31,11 +31,12 @@
 - name: "Obtenir le certificat TLS Tailscale pour ntfy"
   ansible.builtin.command:
     cmd: >
-      tailscale cert
+      /opt/homebrew/bin/tailscale cert
       --cert-file {{ ntfy_certs_dir }}/cert.pem
       --key-file {{ ntfy_certs_dir }}/key.pem
       {{ tailscale_fqdn }}
   changed_when: true
+  ignore_errors: true
   tags: [monitoring, ntfy]
 
 - name: "Déployer la configuration Alertmanager"

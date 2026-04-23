@@ -4,7 +4,9 @@
 set -euo pipefail
 
 NTFY_URL="http://localhost:{{ ntfy_port }}/{{ ntfy_topic }}"
-LOG_FILE="/tmp/nas-logo-backup.log"
+LOG_DIR="$HOME/Library/Logs/nas-logo"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/backup.log"
 
 notify() {
   local title="$1" msg="$2" priority="${3:-default}"

@@ -1,0 +1,23 @@
+# docker-compose whisper NAS-logo — généré par Ansible
+
+name: whisper
+
+services:
+  whisper:
+    container_name: whisper
+    image: fedirz/faster-whisper-server:latest-cpu
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:{{ whisper_port }}:8000"
+    volumes:
+      - "{{ whisper_data_dir }}/models:/root/.cache/huggingface/hub"
+    environment:
+      WHISPER__MODEL: "{{ whisper_model }}"
+      WHISPER__INFERENCE_DEVICE: cpu
+      WHISPER__LANGUAGE: "{{ whisper_language }}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s

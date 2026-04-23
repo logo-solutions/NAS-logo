@@ -6,7 +6,9 @@ set -euo pipefail
 
 SOURCE_DIR="$1"
 TRIAGE="{{ triage_bin }}"
-LOG_FILE="/tmp/nas-logo-import-scans.log"
+LOG_DIR="$HOME/Library/Logs/nas-logo"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/import-scans.log"
 
 if [ -z "$SOURCE_DIR" ] || [ ! -d "$SOURCE_DIR" ]; then
   echo "Usage: $0 <dossier-source>" >&2

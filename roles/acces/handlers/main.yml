@@ -3,4 +3,4 @@
   ansible.builtin.command:
     cmd: launchctl kickstart -k system/com.openssh.sshd
   become: true
-  changed_when: true
+  changed_when: false

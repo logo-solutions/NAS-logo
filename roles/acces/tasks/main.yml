@@ -1,5 +1,5 @@
 ---
-# roles/acces — SSH hardening
+# roles/acces — SSH hardening + clés autorisées
 
 - name: "Configurer SSH (désactiver auth par mot de passe et root login)"
   ansible.builtin.template:
@@ -9,4 +9,14 @@
     validate: sshd -t -f %s
   notify: reload sshd
   become: true
-  tags: [acces]
+  tags: [acces, sshd]
+
+- name: "Déployer les clés SSH autorisées"
+  ansible.posix.authorized_key:
+    user: "{{ mac_user }}"
+    key: "{{ item.key }}"
+    comment: "{{ item.comment }}"
+    state: present
+  loop: "{{ ssh_authorized_keys }}"
+  when: ssh_authorized_keys is defined and ssh_authorized_keys | length > 0
+  tags: [acces, ssh_keys]

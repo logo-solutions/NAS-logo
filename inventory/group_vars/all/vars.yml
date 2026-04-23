@@ -31,15 +31,14 @@ grafana_dashboard_node_id: 1860
 
 # Sauvegarde
 backup_dir: "{{ ssd_mount_point }}/backups"
-hetzner_host: "{{ vault_hetzner_host }}"
+hetzner_host: "88.99.49.100"
 hetzner_user: "{{ vault_hetzner_user }}"
 hetzner_remote_path: immich-backup
 backup_daily_keep: 7
-backup_weekly_keep: 4
-backup_monthly_keep: 12
 
 # Tailscale
 tailscale_hostname: macmini
+tailscale_tags: "tag:nas"
 
 # Immich
 immich_api_key: "{{ vault_immich_api_key }}"
@@ -47,6 +46,9 @@ immich_api_key: "{{ vault_immich_api_key }}"
 # Paperless-ngx
 paperless_port: 8010
 paperless_data_dir: "{{ ssd_mount_point }}/paperless"
+paperless_db_name: paperless
+paperless_db_user: paperless
+paperless_db_password: "{{ vault_paperless_db_password }}"
 paperless_ocr_threshold: 20
 tesseract_bin: /opt/homebrew/bin/tesseract
 triage_bin: /usr/local/bin/nas-logo-triage.sh
@@ -60,8 +62,6 @@ paperless_users:
 # SMB
 smb_share_name: "NAS-logo"
 smb_share_path: "{{ files_dir }}"
-smb_alban_password: "{{ vault_smb_alban_password }}"
-smb_ilan_password: "{{ vault_smb_ilan_password }}"
 smb_users:
   - username: alban
     fullname: Alban
@@ -69,6 +69,9 @@ smb_users:
   - username: ilan
     fullname: Ilan
     password: "{{ vault_smb_ilan_password }}"
+  - username: alice
+    fullname: Alice
+    password: "{{ vault_smb_alice_password }}"
 
 # Meilisearch
 meilisearch_port: 7700
@@ -90,9 +93,9 @@ immich_users:
 # Gmail → Paperless / Immich
 gmail_user: "{{ vault_gmail_user }}"
 
-# Docker Desktop (Apple Silicon)
-docker_bin: /Applications/Docker.app/Contents/Resources/bin/docker
-docker_host: "unix:///Users/{{ ansible_user_id }}/.docker/run/docker.sock"
+# Docker — Colima (Apple Silicon)
+docker_bin: /opt/homebrew/bin/docker
+docker_host: "unix:///Users/{{ ansible_user_id }}/.colima/default/docker.sock"
 
 # Personnes — arbo par personne : imports/ paperless/ files/
 personnes:
@@ -108,10 +111,21 @@ personnes:
   - famille-gourmelon
   - famille-vasseur
 
+# Whisper — transcription audio → texte
+whisper_port: 8020
+whisper_data_dir: "{{ ssd_mount_point }}/whisper"
+whisper_model: small
+whisper_language: fr
+
 # n8n — automatisation de workflows
 n8n_port: 5679
 n8n_data_dir: "{{ ssd_mount_point }}/n8n"
 n8n_user: admin
+
+# SSH — clés publiques autorisées
+ssh_authorized_keys:
+  - comment: "alice-windows"
+    key: "{{ vault_alice_ssh_public_key }}"
 
 # Ansible collections requises
 ansible_collections:

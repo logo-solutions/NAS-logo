@@ -3,12 +3,28 @@
 name: paperless
 
 services:
+  paperless-db:
+    container_name: paperless_db
+    image: postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+      - "{{ paperless_data_dir }}/db:/var/lib/postgresql/data"
+    environment:
+      POSTGRES_DB: "{{ paperless_db_name }}"
+      POSTGRES_USER: "{{ paperless_db_user }}"
+      POSTGRES_PASSWORD: "{{ paperless_db_password }}"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "{{ paperless_db_user }}"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   paperless-redis:
     container_name: paperless_redis
     image: redis:7-alpine
     restart: unless-stopped
     volumes:
-      - {{ paperless_data_dir }}/redis:/data
+      - "{{ paperless_data_dir }}/redis:/data"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
@@ -20,17 +36,23 @@ services:
     image: ghcr.io/paperless-ngx/paperless-ngx:latest
     restart: unless-stopped
     depends_on:
+      paperless-db:
+        condition: service_healthy
       paperless-redis:
         condition: service_healthy
     ports:
-      - {{ paperless_port }}:8000
+      - "{{ paperless_port }}:8000"
     volumes:
-      - {{ paperless_data_dir }}/data:/usr/src/paperless/data
-      - {{ paperless_data_dir }}/media:/usr/src/paperless/media
-      - {{ paperless_data_dir }}/consume:/usr/src/paperless/consume
-      - {{ paperless_data_dir }}/export:/usr/src/paperless/export
+      - "{{ paperless_data_dir }}/data:/usr/src/paperless/data"
+      - "{{ paperless_data_dir }}/media:/usr/src/paperless/media"
+      - "{{ paperless_data_dir }}/consume:/usr/src/paperless/consume"
+      - "{{ paperless_data_dir }}/export:/usr/src/paperless/export"
     environment:
       PAPERLESS_REDIS: redis://paperless-redis:6379
+      PAPERLESS_DBHOST: paperless-db
+      PAPERLESS_DBNAME: "{{ paperless_db_name }}"
+      PAPERLESS_DBUSER: "{{ paperless_db_user }}"
+      PAPERLESS_DBPASS: "{{ paperless_db_password }}"
       PAPERLESS_OCR_LANGUAGE: fra+eng
       PAPERLESS_SECRET_KEY: "{{ vault_paperless_secret_key }}"
       PAPERLESS_ADMIN_USER: admin

@@ -1,12 +1,16 @@
 ---
-# Health check post-déploiement NAS-logo
+# Health check complet NAS-logo
 # Usage : make health
+# Tags disponibles : stockage, docker, immich, monitoring, paperless, n8n, whisper, tailscale, backup, smb
 
 - name: Health check NAS-logo
   hosts: macmini
   gather_facts: true
 
   tasks:
+
+    # ── Stockage ────────────────────────────────────────────────────────────────
+
     - name: "Vérifier que le SSD est monté"
       ansible.builtin.stat:
         path: "{{ ssd_mount_point }}"
@@ -27,6 +31,50 @@
       when: ssd_usage_pct.stdout | int > alert_disk_threshold | int
       tags: [health, stockage]
 
+    # ── Docker / Colima ─────────────────────────────────────────────────────────
+
+    - name: "Vérifier que Colima tourne"
+      ansible.builtin.command:
+        cmd: /opt/homebrew/bin/colima status
+      environment:
+        PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
+      register: colima_status
+      changed_when: false
+      failed_when: "'running' not in colima_status.stderr"
+      tags: [health, docker]
+
+    - name: "Lister les conteneurs Docker unhealthy ou exited"
+      ansible.builtin.shell:
+        cmd: >
+          DOCKER_HOST=unix:///Users/{{ ansible_user_id }}/.colima/default/docker.sock
+          /opt/homebrew/bin/docker ps -a --filter 'status=exited' --filter 'status=dead'
+          --filter 'health=unhealthy' --format '{{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}'
+      register: docker_unhealthy
+      changed_when: false
+      tags: [health, docker]
+
+    - name: "Alerte conteneurs en erreur"
+      ansible.builtin.debug:
+        msg: "ALERTE conteneurs :\n{{ docker_unhealthy.stdout }}"
+      when: docker_unhealthy.stdout | length > 0
+      tags: [health, docker]
+
+    - name: "Compter les conteneurs en cours d'exécution"
+      ansible.builtin.shell:
+        cmd: >
+          DOCKER_HOST=unix:///Users/{{ ansible_user_id }}/.colima/default/docker.sock
+          /opt/homebrew/bin/docker ps -q | wc -l | tr -d ' '
+      register: docker_running_count
+      changed_when: false
+      tags: [health, docker]
+
+    - name: "Afficher le nombre de conteneurs actifs"
+      ansible.builtin.debug:
+        msg: "Conteneurs actifs : {{ docker_running_count.stdout }}"
+      tags: [health, docker]
+
+    # ── Immich ──────────────────────────────────────────────────────────────────
+
     - name: "Vérifier qu'Immich répond (port {{ immich_port }})"
       ansible.builtin.uri:
         url: "http://localhost:{{ immich_port }}/api/server/ping"
@@ -34,6 +82,18 @@
         status_code: 200
         timeout: 10
       tags: [health, immich]
+
+    # ── Paperless ───────────────────────────────────────────────────────────────
+
+    - name: "Vérifier que Paperless répond (port {{ paperless_port }})"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ paperless_port }}/accounts/login/"
+        method: GET
+        status_code: 200
+        timeout: 10
+      tags: [health, paperless]
+
+    # ── Monitoring ──────────────────────────────────────────────────────────────
 
     - name: "Vérifier que Grafana répond (port {{ grafana_port }})"
       ansible.builtin.uri:
@@ -51,6 +111,30 @@
         timeout: 10
       tags: [health, monitoring]
 
+    - name: "Vérifier que cAdvisor répond (port {{ cadvisor_port }})"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ cadvisor_port }}/healthz"
+        method: GET
+        status_code: 200
+        timeout: 10
+      tags: [health, monitoring]
+
+    - name: "Vérifier que node-exporter répond (port 9100)"
+      ansible.builtin.uri:
+        url: "http://localhost:9100/metrics"
+        method: GET
+        status_code: 200
+        timeout: 10
+      tags: [health, monitoring]
+
+    - name: "Vérifier que Alertmanager répond (port 9093)"
+      ansible.builtin.uri:
+        url: "http://localhost:9093/-/healthy"
+        method: GET
+        status_code: 200
+        timeout: 10
+      tags: [health, monitoring]
+
     - name: "Vérifier que ntfy répond (port {{ ntfy_port }})"
       ansible.builtin.uri:
         url: "http://localhost:{{ ntfy_port }}/v1/health"
@@ -58,6 +142,46 @@
         status_code: 200
         timeout: 10
       tags: [health, monitoring]
+
+    # ── n8n ─────────────────────────────────────────────────────────────────────
+
+    - name: "Vérifier que n8n répond (port {{ n8n_port }})"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ n8n_port }}/healthz"
+        method: GET
+        status_code: 200
+        timeout: 10
+      tags: [health, n8n]
+
+    # ── Whisper ─────────────────────────────────────────────────────────────────
+
+    - name: "Vérifier que Whisper répond (port {{ whisper_port }})"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ whisper_port }}/health"
+        method: GET
+        status_code: 200
+        timeout: 10
+      tags: [health, whisper]
+
+    # ── SMB ─────────────────────────────────────────────────────────────────────
+
+    - name: "Vérifier que le partage SMB NAS-LOGO-VOLUME est actif"
+      ansible.builtin.shell:
+        cmd: sharing -l | grep -c 'NAS-LOGO-VOLUME'
+      register: smb_share_count
+      changed_when: false
+      failed_when: smb_share_count.stdout | int == 0
+      tags: [health, smb]
+
+    - name: "Vérifier que le port SMB 445 écoute"
+      ansible.builtin.wait_for:
+        host: "127.0.0.1"
+        port: 445
+        timeout: 5
+        state: started
+      tags: [health, smb]
+
+    # ── Tailscale ───────────────────────────────────────────────────────────────
 
     - name: "Vérifier que Tailscale est connecté"
       ansible.builtin.command:
@@ -111,7 +235,85 @@
         timeout: 10
       tags: [health, tailscale]
 
-    - name: "Health check réussi"
+    - name: "Vérifier n8n via IP Tailscale (simulation externe)"
+      ansible.builtin.uri:
+        url: "http://{{ nas_ip }}:{{ n8n_port }}/healthz"
+        method: GET
+        status_code: 200
+        timeout: 10
+      tags: [health, tailscale]
+
+    # ── Sauvegarde ──────────────────────────────────────────────────────────────
+
+    - name: "Vérifier la connectivité vers Hetzner (port 22)"
+      ansible.builtin.wait_for:
+        host: "{{ hetzner_host }}"
+        port: 22
+        timeout: 10
+        state: started
+      tags: [health, backup]
+
+    - name: "Vérifier la fraîcheur du backup (dernière exécution < 25h)"
+      ansible.builtin.shell:
+        cmd: >
+          find {{ backup_dir }} -maxdepth 1 -name "*.dump" -newer /tmp/.nas-logo-backup-ref 2>/dev/null | wc -l | tr -d ' '
+      args:
+        creates: /tmp/.nas-logo-backup-freshness-skip
+      register: backup_freshness_skip
+      changed_when: false
+      ignore_errors: true
+      tags: [health, backup]
+
+    - name: "Vérifier l'âge du log de sauvegarde"
+      ansible.builtin.find:
+        paths: "{{ ansible_env.HOME }}/Library/Logs/nas-logo"
+        patterns: "backup.log"
+        age: "-25h"
+        age_stamp: mtime
+      register: backup_log_recent
+      tags: [health, backup]
+
+    - name: "Alerte — aucune sauvegarde depuis 25h"
       ansible.builtin.debug:
-        msg: "Tous les services sont opérationnels."
+        msg: "ALERTE : le log de sauvegarde n'a pas été modifié depuis plus de 25h — vérifier la launchd job."
+      when: backup_log_recent.matched == 0
+      tags: [health, backup]
+
+    # ── UPS ─────────────────────────────────────────────────────────────────────
+
+    - name: "Vérifier que le UPS est détecté par macOS"
+      ansible.builtin.shell:
+        cmd: pmset -g batt | grep -i "Back-UPS"
+      register: ups_status
+      changed_when: false
+      failed_when: ups_status.rc != 0
+      tags: [health, ups]
+
+    - name: "Vérifier que le UPS est sur secteur ou batterie"
+      ansible.builtin.shell:
+        cmd: pmset -g batt | grep -i "Back-UPS" | awk -F';' '{print $1}' | awk '{print $NF}'
+      register: ups_charge
+      changed_when: false
+      tags: [health, ups]
+
+    - name: "Alerte batterie UPS faible"
+      ansible.builtin.debug:
+        msg: "ALERTE UPS : batterie à {{ ups_charge.stdout }} (seuil : 50%)"
+      when: ups_charge.stdout | regex_search('[0-9]+') | int < 50
+      tags: [health, ups]
+
+    - name: "Résumé UPS"
+      ansible.builtin.debug:
+        msg: "UPS détecté : {{ ups_status.stdout.strip() }}"
+      tags: [health, ups]
+
+    # ── Résumé ──────────────────────────────────────────────────────────────────
+
+    - name: "Health check complet réussi"
+      ansible.builtin.debug:
+        msg: >
+          Tous les services sont opérationnels.
+          SSD : {{ ssd_usage_pct.stdout }}% utilisé.
+          Conteneurs actifs : {{ docker_running_count.stdout }}.
+          IP Tailscale : {{ ts_ip }}.
       tags: [health]

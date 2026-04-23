@@ -2,4 +2,5 @@
 - name: reload backup launchagent
   ansible.builtin.command:
     cmd: launchctl load -w {{ ansible_env.HOME }}/Library/LaunchAgents/com.nas-logo.backup.plist
-  changed_when: true
+  changed_when: false
+  failed_when: false

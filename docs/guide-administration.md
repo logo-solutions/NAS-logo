@@ -68,14 +68,21 @@ export PATH="/opt/homebrew/bin:$PATH"
 ```
 
 ### URLs (via Tailscale uniquement)
-| Service      | URL                              | Credentials          |
-|--------------|----------------------------------|----------------------|
-| Immich       | http://100.113.214.55:2283       | compte Immich        |
-| Paperless    | http://100.113.214.55:8010       | admin / 1.Ctoutpaper |
-| Grafana      | http://100.113.214.55:3000       | admin / 1.Ctoutgraf  |
-| Prometheus   | http://100.113.214.55:9090       | (sans auth)          |
-| ntfy         | http://100.113.214.55:8090       | (sans auth)          |
-| Meilisearch  | http://100.113.214.55:7700       | (sans auth)          |
+| Service      | URL                              | Credentials          | Accès réseau |
+|--------------|----------------------------------|----------------------|--------------|
+| Immich       | http://100.113.214.55:2283       | compte Immich        | Tailscale    |
+| Paperless    | http://100.113.214.55:8010       | admin / voir vault   | Tailscale    |
+| Grafana      | http://100.113.214.55:3000       | admin / voir vault   | Tailscale    |
+| ntfy         | http://100.113.214.55:8090       | (sans auth)          | Tailscale    |
+| Meilisearch  | http://100.113.214.55:7700       | master key           | Tailscale    |
+| Prometheus   | http://localhost:9090            | (sans auth)          | **localhost uniquement** — SSH tunnel si besoin |
+| cAdvisor     | http://localhost:8080            | (sans auth)          | **localhost uniquement** |
+| Alertmanager | http://localhost:9093            | (sans auth)          | **localhost uniquement** |
+
+> **SSH tunnel** pour accéder à Prometheus/Grafana depuis son Mac :
+> ```bash
+> ssh -L 9090:localhost:9090 logo@100.113.214.55
+> ```
 
 ---
 
@@ -187,46 +194,74 @@ docker system prune -a --volumes
 ### Fonctionnement
 - **Cron quotidien :** 03h00 tous les jours via LaunchAgent
 - **Script :** `/usr/local/bin/nas-logo-backup.sh`
-- **Dump DB :** `/usr/local/bin/nas-logo-dump-db.sh`
+- **Dump DB :** `/usr/local/bin/nas-logo-dump-db.sh` (Immich + Paperless)
 - **Destination :** Hetzner Storage Box `u575742.your-storagebox.de` via rclone (SFTP chiffré)
-- **Remote path :** `immich-backup` (sans slash initial)
-- **Logs :** `/tmp/nas-logo-backup.log` et `/tmp/nas-logo-backup.err`
+- **Logs :** `~/Library/Logs/nas-logo/backup.log`
+
+### Ce qui est sauvegardé
+| Donnée | Méthode |
+|--------|---------|
+| Photos Immich | rclone sync → Hetzner |
+| DB Immich (PostgreSQL) | `pg_dumpall` → `immich-db-YYYYMMDD.sql.gz` |
+| Documents Paperless | rclone sync → Hetzner |
+| DB Paperless (PostgreSQL) | `pg_dump` → `paperless-db-YYYYMMDD.sql.gz` |
 
 ### Lancer une sauvegarde manuelle
 ```bash
-ssh logo@100.113.214.55 '/usr/local/bin/nas-logo-backup.sh'
-# ou depuis ton Mac :
+nas-logo-backup.sh
+# ou :
 make backup
 ```
 
 ### Vérifier le dernier backup
 ```bash
-# Voir les logs
-cat /tmp/nas-logo-backup.log | tail -30
-
-# Lister les fichiers sur Hetzner
-rclone ls hetzner-crypt:immich-backup --max-depth 1
+tail -30 ~/Library/Logs/nas-logo/backup.log
+nas-logo-restore.sh --list
 ```
 
 ### Structure des backups sur Hetzner
 ```
-immich-backup/
-├── immich-db-YYYYMMDD-HHMMSS.sql.gz   — dump PostgreSQL
-└── immich/                            — fichiers photos (rclone sync)
+hetzner-crypt:current/
+├── backups/
+│   ├── immich-db-YYYYMMDD-HHMMSS.sql.gz    — dump PostgreSQL Immich
+│   └── paperless-db-YYYYMMDD-HHMMSS.sql.gz — dump PostgreSQL Paperless
+├── immich/                                  — photos/vidéos
+└── paperless/                               — documents PDF + media
+
+hetzner-crypt:versions/YYYYMMDD/             — snapshots quotidiens (7 jours)
 ```
 
-### Problème connu : dump DB échoue
-Le dump PostgreSQL échoue avec `Operation not permitted` car le SSD a des restrictions d'écriture.
+### Restauration depuis Hetzner
 
-**Fix temporaire :** dumper vers `/tmp` puis copier :
 ```bash
-DOCKER_HOST=unix://$HOME/.colima/default/docker.sock \
-  docker exec immich_postgres pg_dumpall -U immich | gzip > /tmp/immich-db-$(date +%Y%m%d).sql.gz
+# Lister les versions disponibles
+nas-logo-restore.sh --list
 
-cp /tmp/immich-db-*.sql.gz /Volumes/logousb/SSD/NAS-LOGO-VOLUME/backups/
+# Simuler la restauration (dry-run)
+nas-logo-restore.sh --dry-run
+
+# Restaurer la dernière version
+nas-logo-restore.sh
+
+# Restaurer une version spécifique
+nas-logo-restore.sh --version 20260419
 ```
 
-**Fix permanent :** à implémenter dans Ansible — changer le chemin de dump vers `/tmp`.
+Le script `nas-logo-restore.sh` :
+1. Arrête Immich et Paperless
+2. Synchronise les fichiers depuis Hetzner (rclone)
+3. **Immich** : supprime `immich-db/`, réinitialise PostgreSQL, restaure le dump SQL
+4. **Paperless** : démarre `paperless_db`, restaure le dump SQL
+5. Redémarre Immich et Paperless
+
+**Important — après restore Immich :** si erreur 500, vérifier qu'aucune instance Docker Desktop n'est active sur le port 2283 :
+```bash
+DOCKER_HOST=unix://$HOME/.docker/run/docker.sock docker ps | grep 2283
+# Si une instance tourne → l'arrêter :
+DOCKER_HOST=unix://$HOME/.docker/run/docker.sock docker compose -f ~/immich/docker-compose.yml down
+# Puis relancer via Colima :
+docker compose -f ~/immich/docker-compose.yml down && docker compose -f ~/immich/docker-compose.yml up -d
+```
 
 ---
 
@@ -301,14 +336,12 @@ Nécessite un accès physique (impossible via SSH / SIP activé).
    make bootstrap
    make install
    ```
-6. Restaurer les photos depuis Hetzner :
+6. Restaurer depuis Hetzner :
    ```bash
-   rclone sync hetzner-crypt:immich-backup/immich /Volumes/logousb/SSD/NAS-LOGO-VOLUME/immich
+   nas-logo-restore.sh --list       # voir les versions
+   nas-logo-restore.sh --dry-run    # vérifier avant d'exécuter
+   nas-logo-restore.sh              # restaurer
    ```
-7. Restaurer la base de données :
-   ```bash
-   gunzip -c /Volumes/logousb/SSD/NAS-LOGO-VOLUME/backups/immich-db-LATEST.sql.gz | \
-     docker exec -i immich_postgres psql -U immich
-   ```
+7. Si Immich affiche une erreur 500 après restore → voir section **Restauration depuis Hetzner** ci-dessus (conflit Docker Desktop).
 
-> **RTO/RPO non validés** — un test de restore complet reste à faire.
+> **RTO/RPO validés le 2026-04-19** — test de restore complet effectué avec succès (backup 20260413 et 20260419).

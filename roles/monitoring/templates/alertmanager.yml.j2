@@ -4,12 +4,14 @@ global:
   resolve_timeout: 5m
 
 time_intervals:
-  - name: journee
+  - name: nuit
     time_intervals:
       - times:
-          - start_time: "07:00"
-            end_time: "21:00"
-        weekdays: ["monday:sunday"]
+          - start_time: "21:00"
+            end_time: "24:00"
+      - times:
+          - start_time: "00:00"
+            end_time: "07:00"
 
 route:
   receiver: ntfy
@@ -17,8 +19,8 @@ route:
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
-  active_time_intervals:
-    - journee
+  mute_time_intervals:
+    - nuit
 
 receivers:
   - name: ntfy

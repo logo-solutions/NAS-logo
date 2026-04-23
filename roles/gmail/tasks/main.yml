@@ -5,7 +5,9 @@
   ansible.builtin.template:
     src: gmail-fetch.py.j2
     dest: /usr/local/bin/nas-logo-gmail-fetch.py
-    mode: "0755"
+    mode: "0700"
+    owner: "{{ mac_user }}"
+    group: staff
   become: true
   no_log: true
   tags: [gmail]

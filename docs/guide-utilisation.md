@@ -155,8 +155,9 @@ Déposer le fichier directement dans :
 ```
 Paperless le détecte automatiquement, lance l'OCR et l'indexe.
 
-### Option 3 — Email (à venir)
-Une intégration IMAP Gmail est prévue — les pièces jointes PDF seront automatiquement importées.
+### Option 3 — Email (automatique)
+Les pièces jointes Gmail (PDF, docs) sont automatiquement importées dans Paperless chaque nuit.  
+Pour déclencher manuellement : `ssh logo@100.113.214.55 'nas-logo-gmail-fetch.py'`
 
 ---
 
@@ -165,7 +166,8 @@ Une intégration IMAP Gmail est prévue — les pièces jointes PDF seront autom
 ### Ce qui est sauvegardé
 - Toutes les photos Immich
 - La base de données Immich (métadonnées, albums, partages)
-- Les documents Paperless
+- Tous les documents Paperless
+- La base de données Paperless (index, tags, correspondants)
 
 ### Quand
 - **Automatique** : chaque nuit à 03h00

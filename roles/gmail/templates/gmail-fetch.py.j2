@@ -30,10 +30,11 @@ PAPERLESS_TOKEN = "{{ vault_paperless_api_token }}"
 IMMICH_URL = "http://localhost:{{ immich_port }}"
 IMMICH_KEY = "{{ vault_immich_api_key }}"
 
-NTFY_URL   = "http://localhost:{{ ntfy_port }}/{{ vault_ntfy_topic }}"
+NTFY_URL   = "http://localhost:{{ ntfy_port }}/{{ ntfy_topic }}"
 
 STATE_FILE = "{{ ansible_env.HOME }}/.nas-logo-gmail-state.json"
-LOG_FILE   = "/tmp/nas-logo-gmail-fetch.log"
+LOG_FILE   = os.path.expanduser("~/Library/Logs/nas-logo/gmail-fetch.log")
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 
 LABEL_DONE = "NAS-archivé"
 

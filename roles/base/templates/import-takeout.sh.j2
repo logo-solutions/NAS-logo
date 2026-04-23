@@ -7,7 +7,9 @@
 HOST="${1:-localhost}"
 SOURCE="${2:-{{ ssd_mount_point }}/imports}"
 
-LOG_FILE="/tmp/nas-logo-import-takeout.log"
+LOG_DIR="$HOME/Library/Logs/nas-logo"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/import-takeout.log"
 NTFY_URL="http://${HOST}:{{ ntfy_port }}/{{ ntfy_topic }}"
 IMMICH_URL="http://${HOST}:{{ immich_port }}"
 IMMICH_KEY="{{ vault_immich_api_key }}"
