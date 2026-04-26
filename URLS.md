@@ -8,8 +8,8 @@ IP Tailscale : `100.113.214.55`
 |---|---|---|
 | Immich (photos) | http://100.113.214.55:2283 | loicgourmelon@gmail.com / `NasLogo2026!` |
 | Paperless (docs) | http://100.113.214.55:8010 | admin / `NasLogo2026!` |
-| n8n (automation) | http://100.113.214.55:5679 | loicgourmelon@gmail.com |
-| Grafana (monitoring) | http://100.113.214.55:3000 | admin / voir vault |
+| n8n (automation) | http://100.113.214.55:5679 | loicgourmelon@gmail.com / `NasLogo2026!` |
+| Grafana (monitoring) | http://100.113.214.55:3000 | admin / `L_z8GhVNHS29vR1S_iLSXFsOu2xNRgfM` |
 | Prometheus | http://100.113.214.55:9090 | — |
 | cAdvisor | http://100.113.214.55:8080 | — |
 | Alertmanager | http://100.113.214.55:9093 | — |
