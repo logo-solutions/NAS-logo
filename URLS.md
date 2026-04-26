@@ -15,7 +15,7 @@ IP Tailscale : `100.113.214.55`
 | Alertmanager | http://100.113.214.55:9093 | — |
 | ntfy (alertes) | http://100.113.214.55:8090 | topic : nas-logo |
 | Meilisearch UI | http://100.113.214.55:7701 | — |
-| Meilisearch API | http://100.113.214.55:7700 | clé : voir vault |
+| Meilisearch API | http://100.113.214.55:7700 | clé : `RuEpeN4LAI9O3K9TBA1gVqpLA2TEfz4nqhV1iVAfTNo` |
 | Whisper API | http://100.113.214.55:8020 | — |
 
 ## Accès SSH
@@ -30,10 +30,15 @@ ssh logo@100.113.214.55
 smb://100.113.214.55/NAS-logo
 ```
 
-Comptes : alban / ilan / alice (mots de passe dans vault.yml)
+| Compte | Mot de passe |
+|---|---|
+| alban | `Alban-NAS-2026` |
+| ilan | `Ilan-NAS-2026` |
+| alice | `Alice-NAS-2026` |
 
 ## Sauvegarde Hetzner
 
 ```
 sftp://u575742@88.99.49.100
 ```
+Mot de passe : `1.Ctouthetzner`
