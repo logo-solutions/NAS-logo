@@ -62,6 +62,24 @@
   when: colima_plist.changed
   tags: [docker]
 
+- name: "Ajouter le SSD logousb dans les mounts Colima"
+  ansible.builtin.lineinfile:
+    path: "/Users/{{ ansible_user_id }}/.colima/default/colima.yaml"
+    regexp: ".*location: /Volumes/logousb.*"
+    line: "  - location: /Volumes/logousb"
+    insertafter: "^mounts:"
+  register: colima_mount_ssd
+  tags: [docker]
+
+- name: "Ajouter le HDD NAS-LOGO-DATA dans les mounts Colima"
+  ansible.builtin.lineinfile:
+    path: "/Users/{{ ansible_user_id }}/.colima/default/colima.yaml"
+    regexp: ".*location: /Volumes/NAS-LOGO-DATA.*"
+    line: "  - location: /Volumes/NAS-LOGO-DATA"
+    insertafter: ".*location: /Volumes/logousb.*"
+  register: colima_mount_hdd
+  tags: [docker]
+
 - name: "Supprimer docker-credential-desktop du config Docker (Colima incompatible)"
   ansible.builtin.lineinfile:
     path: "/Users/{{ ansible_user_id }}/.docker/config.json"

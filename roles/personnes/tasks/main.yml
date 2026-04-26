@@ -3,7 +3,7 @@
 
 - name: "Créer l'arborescence pour chaque personne"
   ansible.builtin.file:
-    path: "{{ ssd_mount_point }}/personnes/{{ item.0 }}/{{ item.1 }}"
+    path: "{{ hdd_nas_volume }}/personnes/{{ item.0 }}/{{ item.1 }}"
     state: directory
     mode: "0755"
   loop: "{{ personnes | product(['imports', 'paperless', 'files']) | list }}"

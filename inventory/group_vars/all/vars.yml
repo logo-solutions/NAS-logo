@@ -8,11 +8,12 @@ ssd_mount_point: /Volumes/logousb/SSD/NAS-LOGO-VOLUME
 
 # HDD externe (données volumineuses froides, ajouté 2026-04-26)
 hdd_mount_point: /Volumes/NAS-LOGO-DATA
+hdd_nas_volume: /Volumes/NAS-LOGO-DATA/NAS-LOGO-VOLUME
 
 # Immich
 immich_version: release
 immich_install_dir: "{{ ansible_env.HOME }}/immich"
-immich_data_dir: "{{ ssd_mount_point }}/immich"
+immich_data_dir: "{{ hdd_nas_volume }}/immich"
 immich_db_dir: "{{ ssd_mount_point }}/immich-db"
 immich_port: 2283
 immich_db_name: immich
@@ -48,7 +49,7 @@ immich_api_key: "{{ vault_immich_api_key }}"
 
 # Paperless-ngx
 paperless_port: 8010
-paperless_data_dir: "{{ ssd_mount_point }}/paperless"
+paperless_data_dir: "{{ hdd_nas_volume }}/paperless"
 paperless_db_name: paperless
 paperless_db_user: paperless
 paperless_db_password: "{{ vault_paperless_db_password }}"
@@ -81,7 +82,7 @@ meilisearch_port: 7700
 meilisearch_ui_port: 7701
 meilisearch_data_dir: "{{ ssd_mount_point }}/meilisearch"
 meilisearch_master_key: "{{ vault_meilisearch_master_key }}"
-files_dir: "{{ ssd_mount_point }}/files"
+files_dir: "{{ hdd_nas_volume }}/files"
 nas_ip: "100.113.214.55"
 
 # Immich — comptes famille
