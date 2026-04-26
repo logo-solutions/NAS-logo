@@ -6,7 +6,7 @@ IP Tailscale : `100.113.214.55`
 
 | Service | URL | Identifiants |
 |---|---|---|
-| Immich (photos) | http://100.113.214.55:2283 | admin : loicgourmelon@gmail.com |
+| Immich (photos) | http://100.113.214.55:2283 | loicgourmelon@gmail.com / `NasLogo2026!` |
 | Paperless (docs) | http://100.113.214.55:8010 | admin / voir vault |
 | n8n (automation) | http://100.113.214.55:5679 | loicgourmelon@gmail.com |
 | Grafana (monitoring) | http://100.113.214.55:3000 | admin / voir vault |

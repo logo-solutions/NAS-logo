@@ -78,6 +78,7 @@ smb_users:
     password: "{{ vault_smb_alice_password }}"
 
 # Meilisearch
+meilisearch_version: "v1.42.1"
 meilisearch_port: 7700
 meilisearch_ui_port: 7701
 meilisearch_data_dir: "{{ ssd_mount_point }}/meilisearch"

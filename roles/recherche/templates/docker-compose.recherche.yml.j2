@@ -5,7 +5,7 @@ name: recherche
 services:
   meilisearch:
     container_name: meilisearch
-    image: getmeili/meilisearch:latest
+    image: getmeili/meilisearch:{{ meilisearch_version }}
     restart: unless-stopped
     ports:
       - {{ meilisearch_port }}:7700
