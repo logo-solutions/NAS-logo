@@ -33,6 +33,14 @@
 
     # ── Docker / Colima ─────────────────────────────────────────────────────────
 
+    - name: "Vérifier que le LaunchAgent Colima est chargé"
+      ansible.builtin.command:
+        cmd: launchctl list com.nas-logo.colima
+      register: colima_agent
+      changed_when: false
+      failed_when: colima_agent.rc != 0
+      tags: [health, docker]
+
     - name: "Vérifier que Colima tourne"
       ansible.builtin.command:
         cmd: /opt/homebrew/bin/colima status

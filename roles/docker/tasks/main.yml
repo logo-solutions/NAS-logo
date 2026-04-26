@@ -1,5 +1,5 @@
 ---
-# roles/docker — Docker Desktop for Mac
+# roles/docker — Colima (Docker runtime)
 
 
 - name: "Vérifier si Docker (Colima) est déjà disponible"
@@ -26,8 +26,40 @@
     cmd: /opt/homebrew/bin/colima start
   environment:
     HOME: "/Users/{{ ansible_user_id }}"
+    PATH: "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin"
   when: docker_check.rc != 0
   changed_when: true
+  tags: [docker]
+
+- name: "Déployer le script de démarrage Colima"
+  ansible.builtin.template:
+    src: colima-start.sh.j2
+    dest: /usr/local/bin/nas-logo-colima-start.sh
+    mode: "0755"
+  become: true
+  tags: [docker]
+
+- name: "Déployer le LaunchAgent Colima"
+  ansible.builtin.template:
+    src: com.nas-logo.colima.plist.j2
+    dest: "/Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.colima.plist"
+    mode: "0644"
+  register: colima_plist
+  tags: [docker]
+
+- name: "Charger (ou recharger) le LaunchAgent Colima"
+  ansible.builtin.command:
+    cmd: "launchctl bootout gui/{{ ansible_user_uid }} /Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.colima.plist"
+  failed_when: false
+  changed_when: false
+  when: colima_plist.changed
+  tags: [docker]
+
+- name: "Activer le LaunchAgent Colima"
+  ansible.builtin.command:
+    cmd: "launchctl bootstrap gui/{{ ansible_user_uid }} /Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.colima.plist"
+  changed_when: true
+  when: colima_plist.changed
   tags: [docker]
 
 - name: "Supprimer docker-credential-desktop du config Docker (Colima incompatible)"

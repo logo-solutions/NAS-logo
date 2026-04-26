@@ -1,0 +1,16 @@
+#!/bin/bash
+# Démarre Colima au login si non déjà en cours
+export PATH=/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin
+export HOME="/Users/{{ ansible_user_id }}"
+
+# Attendre que le système soit prêt
+sleep 10
+
+if /opt/homebrew/bin/colima status 2>/dev/null | grep -q "running"; then
+    echo "$(date) Colima déjà en cours, rien à faire."
+    exit 0
+fi
+
+echo "$(date) Démarrage de Colima..."
+/opt/homebrew/bin/colima start
+echo "$(date) Colima démarré (rc=$?)."
