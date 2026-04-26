@@ -39,14 +39,21 @@ Mac Mini (Apple Silicon)
 │   ├── meilisearch          :7700  — moteur de recherche
 │   └── search-ui            :7701  — UI Meilisearch
 │
-├── SSD externe → /Volumes/logousb/SSD/NAS-LOGO-VOLUME/
+├── SSD données chaudes → /Volumes/logousb/SSD/NAS-LOGO-VOLUME/
 │   ├── immich/              — photos uploadées
 │   ├── immich-db/           — données PostgreSQL
 │   ├── backups/             — dumps DB locaux
-│   ├── imports/             — zone de dépôt (Takeout, scans...)
 │   ├── monitoring/          — données Prometheus + Grafana
 │   ├── paperless/           — documents GED
-│   └── meilisearch/         — index de recherche
+│   ├── meilisearch/         — index de recherche
+│   ├── n8n/                 — données n8n
+│   └── whisper/             — modèles Whisper
+│
+├── HDD données volumineuses → /Volumes/NAS-LOGO-DATA/  (5,5 To APFS, ajouté 2026-04-26)
+│   └── Documents/
+│       ├── abc/             ← ~/Documents/abc (symlink, 37 Go)
+│       └── SSD/             ← ~/Documents/SSD (symlink, 9,1 Go)
+│   (migrations futures : immich, paperless, files, personnes)
 │
 └── Tailscale VPN
     └── IP : 100.113.214.55

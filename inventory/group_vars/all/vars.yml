@@ -3,8 +3,11 @@
 
 mac_user: "{{ ansible_user_id }}"
 
-# SSD externe
+# SSD externe (données chaudes : DB, monitoring, index)
 ssd_mount_point: /Volumes/logousb/SSD/NAS-LOGO-VOLUME
+
+# HDD externe (données volumineuses froides, ajouté 2026-04-26)
+hdd_mount_point: /Volumes/NAS-LOGO-DATA
 
 # Immich
 immich_version: release
