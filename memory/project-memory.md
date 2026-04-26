@@ -1,5 +1,5 @@
 ---
-updated: 2026-04-26 08:30
+updated: 2026-04-26 09:40
 ---
 
 # Mémoire Projet — État Actif
