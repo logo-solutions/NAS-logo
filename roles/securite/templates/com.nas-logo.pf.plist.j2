@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.nas-logo.pf</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>-c</string>
+    <string>/sbin/pfctl -f /etc/pf.anchors/nas-logo 2>/dev/null; /sbin/pfctl -e 2>/dev/null; true</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/nas-logo-pf.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/nas-logo-pf.err</string>
+</dict>
+</plist>

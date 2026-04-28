@@ -50,6 +50,43 @@
   when: tailscale_final.stdout | length > 0
   tags: [securite, tailscale]
 
+- name: "Déployer la config SSH (Tailscale uniquement)"
+  ansible.builtin.template:
+    src: nas-logo-ssh.conf.j2
+    dest: /etc/ssh/sshd_config.d/nas-logo.conf
+    mode: "0644"
+  become: true
+  notify: restart sshd
+  tags: [securite, ssh]
+
+- name: "Déployer les règles pf NAS-logo"
+  ansible.builtin.template:
+    src: nas-logo-pf.conf.j2
+    dest: /etc/pf.anchors/nas-logo
+    mode: "0644"
+  become: true
+  notify: reload pf
+  tags: [securite, firewall]
+
+- name: "Ajouter l'anchor nas-logo dans pf.conf"
+  ansible.builtin.lineinfile:
+    path: /etc/pf.conf
+    line: 'load anchor "nas-logo" from "/etc/pf.anchors/nas-logo"'
+    regexp: 'nas-logo'
+    insertafter: 'load anchor "com.apple"'
+  become: true
+  notify: reload pf
+  tags: [securite, firewall]
+
+- name: "Déployer le LaunchDaemon pf (rechargement au boot)"
+  ansible.builtin.template:
+    src: com.nas-logo.pf.plist.j2
+    dest: /Library/LaunchDaemons/com.nas-logo.pf.plist
+    mode: "0644"
+  become: true
+  notify: reload pf launchdaemon
+  tags: [securite, firewall]
+
 - name: "Activer le firewall macOS (Application Firewall)"
   ansible.builtin.command:
     cmd: /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on

@@ -3,7 +3,7 @@ VAULT_PASS_FILE := $(HOME)/.nas-logo-vault-pass
 BECOME_PASS_FILE := $(HOME)/.nas-logo-become-pass
 VAULT_ARGS := --vault-password-file $(VAULT_PASS_FILE) --become-password-file $(BECOME_PASS_FILE)
 
-.PHONY: bootstrap preflight dryrun install health backup lint claude tailscale-test
+.PHONY: bootstrap preflight dryrun install health backup lint claude tailscale-test scan-disks resilience
 
 bootstrap: ## Étape 1 : Homebrew + Ansible + dépendances système
 	bash bootstrap.sh
@@ -46,6 +46,12 @@ gmail-run: ## Lancer l'import Gmail maintenant (production)
 
 tailscale-test: ## Tester l'accès Tailscale depuis ce laptop (hors réseau interne)
 	ansible-playbook tailscale-test.yml
+
+resilience: ## Déployer arrêt propre + watchdog mounts + n8n PostgreSQL
+	ansible-playbook -i $(INVENTORY) site.yml $(VAULT_ARGS) --tags resilience,n8n
+
+scan-disks: ## Scanner les disques de sauvegarde pour détecter les copies OS accidentelles
+	ansible-playbook -i $(INVENTORY) scan-disks.yml $(VAULT_ARGS)
 
 maintenance-on: ## Suspendre les sauvegardes (mode maintenance)
 	ansible -i $(INVENTORY) macmini -m ansible.builtin.file -a "path=/tmp/nas-logo-maintenance state=touch" $(VAULT_ARGS)

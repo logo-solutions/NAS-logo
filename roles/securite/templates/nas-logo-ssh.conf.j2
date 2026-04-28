@@ -1,0 +1,13 @@
+# NAS-logo SSH hardening — généré par Ansible
+PasswordAuthentication no
+PermitRootLogin no
+ChallengeResponseAuthentication no
+UsePAM yes
+X11Forwarding no
+PrintMotd no
+AcceptEnv LANG LC_*
+Subsystem sftp /usr/libexec/sftp-server
+
+# SSH uniquement sur l'interface Tailscale
+ListenAddress {{ nas_ip }}
+ListenAddress 127.0.0.1

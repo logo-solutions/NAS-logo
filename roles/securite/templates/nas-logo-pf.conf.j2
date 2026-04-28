@@ -1,0 +1,18 @@
+# nas-logo-pf.conf — Firewall pf NAS-logo
+# Généré par Ansible
+# Bloque les ports Docker/services hors Tailscale et localhost
+# Tailscale utilise le range CGNAT 100.64.0.0/10
+
+table <tailscale> { {{ nas_ip }}, 100.64.0.0/10 }
+table <local>     { 127.0.0.0/8 }
+
+# Ports services NAS-logo exposés uniquement via Tailscale
+nas_ports = "{ {{ immich_port }}, {{ paperless_port }}, {{ grafana_port }}, \
+               {{ prometheus_port }}, {{ n8n_port }}, {{ ntfy_port }}, \
+               {{ meilisearch_port }}, {{ whisper_port }}, \
+               8080, 9093, 9100, 7701 }"
+
+# Bloquer ces ports depuis toute source sauf Tailscale et localhost
+block in quick on { en0 en1 } proto tcp to any port $nas_ports
+pass  in quick from <tailscale> to any port $nas_ports
+pass  in quick from <local>     to any port $nas_ports

@@ -28,7 +28,19 @@ echo "==> Dump PostgreSQL Paperless..." >&2
   | gzip > "$PAPERLESS_DUMP"
 echo "==> Dump écrit : $PAPERLESS_DUMP" >&2
 
+# ── n8n ──────────────────────────────────────────────────────────────────────
+N8N_DUMP="$BACKUP_DIR/n8n-db-$(date +%Y%m%d-%H%M%S).sql.gz"
+echo "==> Dump PostgreSQL n8n..." >&2
+{{ docker_bin }} exec n8n_db pg_dump \
+  --clean \
+  --if-exists \
+  --username=n8n \
+  n8n \
+  | gzip > "$N8N_DUMP"
+echo "==> Dump écrit : $N8N_DUMP" >&2
+
 # ── Nettoyage local (> 3 jours) ──────────────────────────────────────────────
 find "$BACKUP_DIR" -name "immich-db-*.sql.gz" -mtime +3 -delete
 find "$BACKUP_DIR" -name "paperless-db-*.sql.gz" -mtime +3 -delete
+find "$BACKUP_DIR" -name "n8n-db-*.sql.gz" -mtime +3 -delete
 echo "==> Nettoyage dumps locaux terminé" >&2

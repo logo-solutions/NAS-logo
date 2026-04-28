@@ -236,3 +236,10 @@ Vérifie dans l'ordre :
 7. Hetzner SFTP joignable (port 22)
 8. Fraîcheur backup < 25h
 9. UPS APC BX750MI détecté (`pmset -g batt`) + batterie > 50%
+
+---
+
+## Instructions de session
+
+**À chaque démarrage de session sur ce projet**, lire impérativement :
+- `/Users/logo/.claude/projects/-Volumes-logousb-SSD-Projects-NAS-logo/memory/project_roadmap.md` — roadmap priorisée, reprendre là où on s'est arrêtés

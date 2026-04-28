@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""NAS-logo — indexeur mbox Gmail → Meilisearch"""
+import email
+import email.header
+import hashlib
+import json
+import mailbox
+import re
+import sys
+from datetime import datetime
+from email.utils import parsedate_to_datetime
+from pathlib import Path
+from urllib import error, request
+
+MEILI_URL  = "http://localhost:{{ meilisearch_port }}"
+MEILI_KEY  = "{{ meilisearch_master_key }}"
+MBOX_PATH  = Path("{{ mail_archives_dir }}/gmail-archive.mbox")
+INDEX      = "emails"
+BATCH_SIZE = 500
+
+
+def meili(method, path, data=None, ignore_errors=False):
+    url = f"{MEILI_URL}{path}"
+    headers = {"Authorization": f"Bearer {MEILI_KEY}", "Content-Type": "application/json"}
+    body = json.dumps(data).encode() if data is not None else None
+    req = request.Request(url, data=body, headers=headers, method=method)
+    try:
+        with request.urlopen(req, timeout=60) as resp:
+            return json.loads(resp.read())
+    except error.HTTPError as e:
+        if ignore_errors:
+            return {}
+        raise
+
+
+def decode_header(value):
+    if not value:
+        return ""
+    parts = email.header.decode_header(value)
+    result = []
+    for part, charset in parts:
+        if isinstance(part, bytes):
+            try:
+                result.append(part.decode(charset or "utf-8", errors="replace"))
+            except (LookupError, TypeError):
+                result.append(part.decode("utf-8", errors="replace"))
+        else:
+            result.append(part)
+    return " ".join(result)
+
+
+def extract_body(msg):
+    body = ""
+    if msg.is_multipart():
+        for part in msg.walk():
+            ct = part.get_content_type()
+            if ct == "text/plain" and not part.get("Content-Disposition"):
+                charset = part.get_content_charset() or "utf-8"
+                try:
+                    body = part.get_payload(decode=True).decode(charset, errors="replace")
+                    break
+                except Exception:
+                    continue
+        if not body:
+            for part in msg.walk():
+                if part.get_content_type() == "text/html":
+                    charset = part.get_content_charset() or "utf-8"
+                    try:
+                        raw = part.get_payload(decode=True).decode(charset, errors="replace")
+                        body = re.sub(r"<[^>]+>", " ", raw)
+                        body = re.sub(r"\s+", " ", body).strip()
+                        break
+                    except Exception:
+                        continue
+    else:
+        charset = msg.get_content_charset() or "utf-8"
+        try:
+            body = msg.get_payload(decode=True).decode(charset, errors="replace")
+        except Exception:
+            body = str(msg.get_payload())
+    return body.strip()
+
+
+def parse_date(msg):
+    date_str = msg.get("Date", "")
+    try:
+        dt = parsedate_to_datetime(date_str)
+        return dt.strftime("%Y-%m-%d %H:%M"), int(dt.timestamp())
+    except Exception:
+        return "", 0
+
+
+def setup_index():
+    meili("POST", "/indexes", {"uid": INDEX, "primaryKey": "id"}, ignore_errors=True)
+    meili("PATCH", f"/indexes/{INDEX}/settings", {
+        "searchableAttributes": ["subject", "body", "from_addr", "to_addr"],
+        "filterableAttributes": ["date_ts"],
+        "sortableAttributes": ["date_ts"],
+        "displayedAttributes": ["id", "from_addr", "to_addr", "date", "date_ts", "subject", "preview", "body"],
+    })
+
+
+def make_id(msg):
+    msg_id = msg.get("Message-ID", "")
+    if msg_id:
+        return hashlib.md5(msg_id.encode()).hexdigest()
+    raw = f"{msg.get('Date','')}{msg.get('Subject','')}{msg.get('From','')}"
+    return hashlib.md5(raw.encode()).hexdigest()
+
+
+def push_batch(docs):
+    meili("POST", f"/indexes/{INDEX}/documents", docs)
+
+
+def main():
+    if not MBOX_PATH.exists():
+        print(f"Fichier mbox introuvable : {MBOX_PATH}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Ouverture de {MBOX_PATH}...")
+    setup_index()
+
+    mbox = mailbox.mbox(str(MBOX_PATH))
+    docs = []
+    total = 0
+
+    for msg in mbox:
+        body = extract_body(msg)
+        date_str, date_ts = parse_date(msg)
+        doc = {
+            "id":        make_id(msg),
+            "from_addr": decode_header(msg.get("From", "")),
+            "to_addr":   decode_header(msg.get("To", "")),
+            "subject":   decode_header(msg.get("Subject", "(sans objet)")),
+            "date":      date_str,
+            "date_ts":   date_ts,
+            "body":      body[:50000],
+            "preview":   body[:300].replace("\n", " "),
+        }
+        docs.append(doc)
+        if len(docs) >= BATCH_SIZE:
+            push_batch(docs)
+            total += len(docs)
+            print(f"  {total} emails indexés...")
+            docs = []
+
+    if docs:
+        push_batch(docs)
+        total += len(docs)
+
+    mbox.close()
+    print(f"Terminé — {total} emails indexés dans Meilisearch (index '{INDEX}').")
+
+
+if __name__ == "__main__":
+    main()

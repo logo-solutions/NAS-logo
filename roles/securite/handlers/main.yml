@@ -3,3 +3,23 @@
   ansible.builtin.command:
     cmd: brew services restart tailscale
   changed_when: true
+
+- name: restart sshd
+  ansible.builtin.command:
+    cmd: launchctl kickstart -k system/com.openssh.sshd
+  become: true
+  changed_when: true
+
+- name: reload pf
+  ansible.builtin.shell:
+    cmd: pfctl -f /etc/pf.conf && pfctl -f /etc/pf.anchors/nas-logo 2>/dev/null; pfctl -e 2>/dev/null; true
+  become: true
+  changed_when: true
+
+- name: reload pf launchdaemon
+  ansible.builtin.shell:
+    cmd: |
+      launchctl bootout system /Library/LaunchDaemons/com.nas-logo.pf.plist 2>/dev/null || true
+      launchctl bootstrap system /Library/LaunchDaemons/com.nas-logo.pf.plist
+  become: true
+  changed_when: true

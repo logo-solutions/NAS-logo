@@ -28,13 +28,27 @@ if ! /usr/local/bin/nas-logo-dump-db.sh 2>&1 | tee -a "$LOG_FILE"; then
   exit 1
 fi
 
-# 2. Sync vers Hetzner chiffré
-echo "==> Sync rclone vers Hetzner..." | tee -a "$LOG_FILE" >&2
-/opt/homebrew/bin/rclone sync "{{ ssd_mount_point }}" hetzner-crypt:current \
-  --backup-dir "hetzner-crypt:versions/$(date +%Y%m%d)" \
+# 2. Sync vers Hetzner chiffré — SSD (DB, index, monitoring)
+echo "==> Sync SSD vers Hetzner..." | tee -a "$LOG_FILE" >&2
+/opt/homebrew/bin/rclone sync "{{ ssd_mount_point }}" hetzner-crypt:current/ssd \
+  --backup-dir "hetzner-crypt:versions/$(date +%Y%m%d)/ssd" \
   --log-level INFO \
   --log-file "$LOG_FILE" \
   --min-age 5m
+
+# 3. Sync vers Hetzner — données critiques HDD (paperless, personnes, files)
+# Immich exclu : volumeux et origine Google Photos conservée
+echo "==> Sync données critiques HDD vers Hetzner..." | tee -a "$LOG_FILE" >&2
+for subdir in paperless personnes files; do
+  src="{{ hdd_nas_volume }}/${subdir}"
+  if [ -d "$src" ]; then
+    /opt/homebrew/bin/rclone sync "$src" "hetzner-crypt:current/hdd/${subdir}" \
+      --backup-dir "hetzner-crypt:versions/$(date +%Y%m%d)/hdd/${subdir}" \
+      --log-level INFO \
+      --log-file "$LOG_FILE" \
+      --min-age 5m
+  fi
+done
 
 # 3. Rétention : purger les anciennes versions
 echo "==> Application de la rétention..." | tee -a "$LOG_FILE" >&2

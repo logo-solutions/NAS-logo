@@ -1,0 +1,74 @@
+---
+# Scan des disques de sauvegarde pour détecter les copies de systèmes d'exploitation
+# Usage : make scan-disks
+# Cherche les signatures macOS/Linux/Windows copiées accidentellement lors des backups
+
+- name: Scan copies OS sur les disques
+  hosts: macmini
+  gather_facts: false
+
+  vars:
+    # Racines à scanner (disques de sauvegarde)
+    scan_roots:
+      - "{{ hdd_mount_point }}/SAUV DD"
+    # Signatures d'un OS copié
+    os_signatures:
+      - "System/Library"
+      - "System/Volumes"
+      - "private/var"
+      - "private/etc"
+      - "usr/local"
+      - "usr/bin"
+      - "bin"
+      - "sbin"
+      - "Windows/System32"
+      - "Windows/SysWOW64"
+      - "boot/grub"
+      - "etc/passwd"
+
+  tasks:
+
+    - name: "Vérifier que les racines de scan sont montées"
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: scan_root_stat
+      loop: "{{ scan_roots }}"
+      tags: [scan]
+
+    - name: "Scanner les copies OS dans {{ item.item }}"
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          found=""
+          root="{{ item.item }}"
+          if [ ! -d "$root" ]; then
+            echo "ABSENT: $root"
+            exit 0
+          fi
+          for sig in System/Library System/Volumes private/var private/etc "usr/local" "usr/bin" bin sbin "Windows/System32" "boot/grub"; do
+            while IFS= read -r match; do
+              size=$(du -sh "$match" 2>/dev/null | cut -f1)
+              found="${found}  ${size}  ${match}\n"
+            done < <(find "$root" -maxdepth 5 -type d -path "*/${sig}" 2>/dev/null | head -20)
+          done
+          if [ -z "$found" ]; then
+            echo "OK — aucune copie OS détectée dans $root"
+          else
+            printf "ATTENTION — copies OS trouvées dans $root :\n${found}"
+          fi
+      register: scan_result
+      changed_when: false
+      loop: "{{ scan_root_stat.results }}"
+      when: item.stat.exists | default(false)
+      loop_control:
+        label: "{{ item.item }}"
+      tags: [scan]
+
+    - name: "Rapport scan copies OS"
+      ansible.builtin.debug:
+        msg: "{{ item.stdout }}"
+      loop: "{{ scan_result.results }}"
+      when: item.stdout is defined
+      loop_control:
+        label: "{{ item.item.item }}"
+      tags: [scan]

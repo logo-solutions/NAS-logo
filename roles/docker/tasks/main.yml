@@ -87,6 +87,56 @@
     state: absent
   tags: [docker]
 
+- name: "Déployer le script d'arrêt propre"
+  ansible.builtin.template:
+    src: nas-logo-shutdown.sh.j2
+    dest: /usr/local/bin/nas-logo-shutdown.sh
+    mode: "0755"
+  become: true
+  tags: [docker, resilience]
+
+- name: "Déployer le LaunchAgent arrêt propre"
+  ansible.builtin.template:
+    src: com.nas-logo.shutdown.plist.j2
+    dest: "/Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.shutdown.plist"
+    mode: "0644"
+  register: shutdown_plist
+  tags: [docker, resilience]
+
+- name: "Charger le LaunchAgent arrêt propre"
+  ansible.builtin.shell:
+    cmd: |
+      launchctl bootout gui/{{ ansible_user_uid }} /Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.shutdown.plist 2>/dev/null || true
+      launchctl bootstrap gui/{{ ansible_user_uid }} /Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.shutdown.plist
+  changed_when: true
+  when: shutdown_plist.changed
+  tags: [docker, resilience]
+
+- name: "Déployer le script watchdog mounts Colima"
+  ansible.builtin.template:
+    src: nas-logo-mount-watchdog.sh.j2
+    dest: /usr/local/bin/nas-logo-mount-watchdog.sh
+    mode: "0755"
+  become: true
+  tags: [docker, resilience]
+
+- name: "Déployer le LaunchAgent watchdog mounts (toutes les 2 min)"
+  ansible.builtin.template:
+    src: com.nas-logo.mount-watchdog.plist.j2
+    dest: "/Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.mount-watchdog.plist"
+    mode: "0644"
+  register: watchdog_plist
+  tags: [docker, resilience]
+
+- name: "Charger le LaunchAgent watchdog mounts"
+  ansible.builtin.shell:
+    cmd: |
+      launchctl bootout gui/{{ ansible_user_uid }} /Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.mount-watchdog.plist 2>/dev/null || true
+      launchctl bootstrap gui/{{ ansible_user_uid }} /Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.mount-watchdog.plist
+  changed_when: true
+  when: watchdog_plist.changed
+  tags: [docker, resilience]
+
 - name: "Vérifier que Docker (Colima) répond"
   ansible.builtin.command:
     cmd: "{{ docker_bin }} info"

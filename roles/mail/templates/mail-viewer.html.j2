@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Archives mail — NAS-logo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; color: #222; }
+  header { background: #1a1a2e; color: #fff; padding: 1rem 1.5rem; display: flex; align-items: center; gap: 1rem; }
+  header h1 { font-size: 1.1rem; font-weight: 600; }
+  #search-box { flex: 1; padding: 0.5rem 1rem; border-radius: 6px; border: none; font-size: 1rem; max-width: 600px; }
+  #count { font-size: 0.85rem; color: #aaa; white-space: nowrap; }
+  main { display: flex; height: calc(100vh - 56px); }
+  #list { width: 380px; min-width: 280px; overflow-y: auto; background: #fff; border-right: 1px solid #ddd; }
+  .item { padding: 0.75rem 1rem; border-bottom: 1px solid #eee; cursor: pointer; transition: background 0.1s; }
+  .item:hover { background: #f0f4ff; }
+  .item.active { background: #e8eeff; border-left: 3px solid #4a6cf7; }
+  .item-subject { font-weight: 500; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item-meta { font-size: 0.78rem; color: #666; margin-top: 2px; display: flex; justify-content: space-between; }
+  .item-preview { font-size: 0.78rem; color: #888; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #viewer { flex: 1; overflow-y: auto; padding: 1.5rem; }
+  #viewer-empty { color: #999; text-align: center; margin-top: 4rem; font-size: 1rem; }
+  #email-header { background: #fff; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem; border: 1px solid #ddd; }
+  #email-subject { font-size: 1.15rem; font-weight: 600; margin-bottom: 0.75rem; }
+  .meta-row { font-size: 0.85rem; color: #555; margin-bottom: 3px; }
+  .meta-row strong { color: #333; }
+  #email-body { background: #fff; border-radius: 8px; padding: 1.25rem; border: 1px solid #ddd; font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+  .highlight { background: #fff176; border-radius: 2px; }
+  #no-results { padding: 2rem; color: #999; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📧 Archives mail</h1>
+  <input id="search-box" type="search" placeholder="Rechercher dans vos emails..." autofocus>
+  <span id="count"></span>
+</header>
+<main>
+  <div id="list"></div>
+  <div id="viewer"><div id="viewer-empty">← Sélectionnez un email</div></div>
+</main>
+
+<script>
+const MEILI_URL = "http://{{ nas_ip }}:{{ meilisearch_port }}";
+const MEILI_KEY = "{{ meilisearch_master_key }}";
+const INDEX     = "emails";
+
+let currentId = null;
+let searchTimeout = null;
+
+async function search(q) {
+  const body = JSON.stringify({ q, limit: 50, sort: ["date_ts:desc"],
+    attributesToHighlight: ["subject", "body"], highlightPreTag: '<mark class="highlight">', highlightPostTag: "</mark>" });
+  const res = await fetch(`${MEILI_URL}/indexes/${INDEX}/search`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${MEILI_KEY}`, "Content-Type": "application/json" },
+    body
+  });
+  return res.json();
+}
+
+function fmt(dateStr) { return dateStr || "—"; }
+function esc(s) { return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function renderList(hits, total) {
+  const list = document.getElementById("list");
+  document.getElementById("count").textContent = total ? `${total} résultats` : "";
+  if (!hits.length) {
+    list.innerHTML = '<div id="no-results">Aucun résultat</div>';
+    return;
+  }
+  list.innerHTML = hits.map(h => {
+    const hi = h._formatted || h;
+    return `<div class="item${h.id===currentId?' active':''}" onclick="showEmail('${h.id}',this)" data-id="${h.id}"
+      data-subject="${esc(h.subject)}" data-from="${esc(h.from_addr)}" data-to="${esc(h.to_addr)}"
+      data-date="${esc(h.date)}" data-body="${esc(h.body)}">
+      <div class="item-subject">${hi.subject||'(sans objet)'}</div>
+      <div class="item-meta"><span>${esc(h.from_addr||'').split('<')[0].trim()}</span><span>${fmt(h.date)}</span></div>
+      <div class="item-preview">${esc((h.preview||''))}</div>
+    </div>`;
+  }).join("");
+}
+
+function showEmail(id, el) {
+  currentId = id;
+  document.querySelectorAll(".item").forEach(i => i.classList.remove("active"));
+  if (el) el.classList.add("active");
+  const subject = el.dataset.subject;
+  const from    = el.dataset.from;
+  const to      = el.dataset.to;
+  const date    = el.dataset.date;
+  const body    = el.dataset.body;
+  document.getElementById("viewer").innerHTML = `
+    <div id="email-header">
+      <div id="email-subject">${subject||'(sans objet)'}</div>
+      <div class="meta-row"><strong>De :</strong> ${from||'—'}</div>
+      <div class="meta-row"><strong>À :</strong> ${to||'—'}</div>
+      <div class="meta-row"><strong>Date :</strong> ${date||'—'}</div>
+    </div>
+    <div id="email-body">${body}</div>`;
+}
+
+async function doSearch(q) {
+  const data = await search(q);
+  renderList(data.hits || [], data.estimatedTotalHits || 0);
+}
+
+document.getElementById("search-box").addEventListener("input", e => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => doSearch(e.target.value), 300);
+});
+
+doSearch("");
+</script>
+</body>
+</html>

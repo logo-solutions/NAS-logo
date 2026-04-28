@@ -1,0 +1,32 @@
+#!/bin/bash
+# nas-logo-shutdown.sh — Arrêt propre des stacks Docker avant coupure macOS
+# Généré par Ansible (NAS-logo)
+# Reste en attente ; sur SIGTERM (logout/shutdown macOS), arrête tous les stacks.
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export DOCKER_HOST="{{ docker_host }}"
+LOG="{{ ansible_env.HOME }}/Library/Logs/nas-logo/shutdown.log"
+
+log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"; }
+
+cleanup() {
+  log "SIGTERM reçu — arrêt propre des stacks Docker"
+  for stack in immich paperless n8n monitoring whisper; do
+    dir="{{ ansible_env.HOME }}/${stack}"
+    if [ -d "$dir" ]; then
+      log "  Arrêt $stack..."
+      /opt/homebrew/bin/docker compose -f "$dir/docker-compose.yml" down --timeout 30 >> "$LOG" 2>&1
+    fi
+  done
+  log "  Arrêt Colima..."
+  /opt/homebrew/bin/colima stop >> "$LOG" 2>&1
+  log "Arrêt propre terminé."
+  exit 0
+}
+
+trap cleanup SIGTERM SIGINT
+
+log "Watchdog démarré (PID $$)"
+while true; do
+  sleep 60
+done

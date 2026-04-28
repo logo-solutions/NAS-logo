@@ -126,6 +126,10 @@ whisper_language: fr
 n8n_port: 5679
 n8n_data_dir: "{{ ssd_mount_point }}/n8n"
 n8n_user: admin
+n8n_db_password: "{{ vault_n8n_db_password }}"
+
+# Mail — indexeur mbox Gmail + viewer Meilisearch
+mail_archives_dir: /Volumes/NAS-LOGO-DATA/MAIL
 
 # SSH — clés publiques autorisées
 ssh_authorized_keys:

@@ -1,0 +1,78 @@
+#!/bin/bash
+# nas-logo-mount-watchdog.sh — Surveille Colima, mounts, conteneurs, disque
+# Généré par Ansible (NAS-logo)
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export DOCKER_HOST="{{ docker_host }}"
+LOG="{{ ansible_env.HOME }}/Library/Logs/nas-logo/mount-watchdog.log"
+LOCK="/tmp/nas-logo-mount-watchdog.lock"
+RESTART_STATE="/tmp/nas-logo-container-restarts.state"
+
+log()   { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"; }
+alert() { curl -s -m 5 -X POST "http://localhost:{{ ntfy_port }}/{{ ntfy_topic }}" \
+            -H "Title: NAS-logo Alerte" -H "Priority: urgent" -H "Tags: warning" \
+            -d "$1" > /dev/null 2>&1; }
+
+# Éviter les exécutions concurrentes
+if [ -f "$LOCK" ]; then
+  log "Une instance tourne déjà, abandon."
+  exit 0
+fi
+touch "$LOCK"
+trap 'rm -f "$LOCK"' EXIT
+
+# ── 1. Colima ────────────────────────────────────────────────────────────────
+if ! /opt/homebrew/bin/colima status 2>&1 | grep -q "running"; then
+  log "ALERTE: Colima n'est pas running — démarrage..."
+  alert "Colima arrêté — redémarrage automatique en cours"
+  /opt/homebrew/bin/colima start >> "$LOG" 2>&1
+  sleep 15
+fi
+
+# ── 2. Mounts critiques ──────────────────────────────────────────────────────
+for mount in "{{ ssd_mount_point }}" "{{ hdd_mount_point }}"; do
+  if ! /opt/homebrew/bin/docker run --rm -v "${mount}:/check:ro" alpine test -d /check 2>/dev/null; then
+    log "ALERTE: mount ${mount} inaccessible depuis Docker — restart Colima + stacks"
+    alert "Mount ${mount} inaccessible — restart Colima + tous les stacks Docker"
+    /opt/homebrew/bin/colima stop >> "$LOG" 2>&1
+    sleep 5
+    /opt/homebrew/bin/colima start >> "$LOG" 2>&1
+    sleep 20
+    for stack in immich paperless n8n monitoring whisper; do
+      dir="{{ ansible_env.HOME }}/${stack}"
+      if [ -d "$dir" ]; then
+        log "  Redémarrage $stack..."
+        /opt/homebrew/bin/docker compose -f "$dir/docker-compose.yml" up -d >> "$LOG" 2>&1
+      fi
+    done
+    alert "Récupération terminée — tous les stacks redémarrés"
+    log "Récupération terminée."
+    break
+  fi
+done
+
+# ── 3. Conteneurs en boucle de redémarrage ───────────────────────────────────
+touch "$RESTART_STATE"
+/opt/homebrew/bin/docker inspect $(/opt/homebrew/bin/docker ps -q) \
+  --format '{{ "{{" }}.Name{{ "}}" }} {{ "{{" }}.RestartCount{{ "}}" }}' 2>/dev/null | \
+while read name count; do
+  name="${name#/}"
+  prev=$(grep "^${name} " "$RESTART_STATE" 2>/dev/null | awk '{print $2}')
+  prev=${prev:-0}
+  if [ "$count" -gt "$prev" ] && [ "$count" -ge 3 ]; then
+    diff=$((count - prev))
+    log "ALERTE: conteneur $name a redémarré $diff fois (total: $count)"
+    alert "Conteneur $name en boucle — $count redémarrages au total"
+  fi
+  # Mise à jour state
+  grep -v "^${name} " "$RESTART_STATE" > "${RESTART_STATE}.tmp" 2>/dev/null || true
+  echo "${name} ${count}" >> "${RESTART_STATE}.tmp"
+  mv "${RESTART_STATE}.tmp" "$RESTART_STATE"
+done
+
+# ── 4. Espace disque SSD ─────────────────────────────────────────────────────
+SSD_PCT=$(df "{{ ssd_mount_point }}" | awk 'NR==2 {gsub(/%/,"",$5); print $5}')
+if [ "${SSD_PCT:-0}" -gt {{ alert_disk_threshold }} ]; then
+  log "ALERTE: SSD utilisé à ${SSD_PCT}% (seuil: {{ alert_disk_threshold }}%)"
+  alert "SSD utilisé à ${SSD_PCT}% — seuil {{ alert_disk_threshold }}% dépassé"
+fi
