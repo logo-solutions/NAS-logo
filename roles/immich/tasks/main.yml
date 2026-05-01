@@ -51,7 +51,7 @@
 
 - name: "Lister les utilisateurs Immich existants"
   ansible.builtin.uri:
-    url: "http://localhost:{{ immich_port }}/api/users"
+    url: "http://localhost:{{ immich_port }}/api/admin/users"
     method: GET
     headers:
       x-api-key: "{{ immich_api_key }}"
@@ -63,7 +63,7 @@
 
 - name: "Créer les comptes Immich manquants"
   ansible.builtin.uri:
-    url: "http://localhost:{{ immich_port }}/api/users"
+    url: "http://localhost:{{ immich_port }}/api/admin/users"
     method: POST
     headers:
       x-api-key: "{{ immich_api_key }}"
@@ -87,7 +87,7 @@
 
 - name: "Lister les utilisateurs Immich (post-création)"
   ansible.builtin.uri:
-    url: "http://localhost:{{ immich_port }}/api/users"
+    url: "http://localhost:{{ immich_port }}/api/admin/users"
     method: GET
     headers:
       x-api-key: "{{ immich_api_key }}"

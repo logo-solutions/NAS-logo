@@ -45,8 +45,9 @@ services:
     volumes:
       - "{{ paperless_data_dir }}/data:/usr/src/paperless/data"
       - "{{ paperless_data_dir }}/media:/usr/src/paperless/media"
-      - "{{ paperless_data_dir }}/consume:/usr/src/paperless/consume"
+      - "{{ hdd_nas_volume }}/paperless/consume:/usr/src/paperless/consume"
       - "{{ paperless_data_dir }}/export:/usr/src/paperless/export"
+      - "{{ paperless_data_dir }}/scripts:/usr/src/paperless/scripts:ro"
     environment:
       PAPERLESS_REDIS: redis://paperless-redis:6379
       PAPERLESS_DBHOST: paperless-db
@@ -62,6 +63,8 @@ services:
       PAPERLESS_CONSUMER_RECURSIVE: "true"
       PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS: "true"
       PAPERLESS_FILENAME_FORMAT: "{{ '{{' }} created_year {{ '}}' }}/{{ '{{' }} title {{ '}}' }}"
+      PAPERLESS_PRE_CONSUME_SCRIPT: /usr/src/paperless/scripts/pre-consume.sh
+      PAPERLESS_POST_CONSUME_SCRIPT: /usr/src/paperless/scripts/post-consume.sh
       PAPERLESS_TASK_WORKERS: 2
       PAPERLESS_THREADS_PER_WORKER: 1
     healthcheck:

@@ -10,6 +10,7 @@ services:
     volumes:
       - ${UPLOAD_LOCATION}:/usr/src/app/upload
       - /etc/localtime:/etc/localtime:ro
+      - {{ ssd_mount_point }}/personnes:/usr/src/app/external:ro
     env_file: .env
     ports:
       - "{{ immich_port }}:{{ immich_port }}"

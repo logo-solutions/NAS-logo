@@ -36,7 +36,7 @@ STATE_FILE = "{{ ansible_env.HOME }}/.nas-logo-gmail-state.json"
 LOG_FILE   = os.path.expanduser("~/Library/Logs/nas-logo/gmail-fetch.log")
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 
-LABEL_DONE = "NAS-archivé"
+LABEL_DONE = "NAS-archive"
 
 # Extensions → destination
 PAPERLESS_EXT = {
@@ -253,6 +253,12 @@ def main():
     total = {"paperless": 0, "immich": 0, "skipped": 0, "emails": 0}
     newly_processed = []
 
+    if not DRY_RUN:
+        try:
+            imap.create(LABEL_DONE)
+        except Exception:
+            pass  # label already exists
+
     for msg_id in msg_ids:
         uid = msg_id.decode()
         if uid in processed_ids:
@@ -293,11 +299,7 @@ def main():
 
         # Archiver dans Gmail
         if not DRY_RUN:
-            # Créer le label NAS-archivé si nécessaire
-            imap.create(LABEL_DONE)
-            # Copier vers NAS-archivé
             imap.copy(msg_id, LABEL_DONE)
-            # Supprimer de INBOX
             imap.store(msg_id, "+FLAGS", "\\Deleted")
 
     if not DRY_RUN:

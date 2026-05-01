@@ -63,6 +63,21 @@ paperless_users:
   - username: ilan
     password: "{{ vault_paperless_ilan_password }}"
 
+# Mapping sous-dossier consume → owner Paperless (private=true : invisible aux autres)
+paperless_consume_users:
+  loic-perso:
+    username: admin
+    private: true
+  alban:
+    username: alban
+    private: true
+  ilan:
+    username: ilan
+    private: true
+  famille:
+    username: admin
+    private: false
+
 # SMB
 smb_share_name: "NAS-logo"
 smb_share_path: "{{ files_dir }}"

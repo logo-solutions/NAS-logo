@@ -24,6 +24,7 @@
     - "{{ paperless_data_dir }}/consume"
     - "{{ paperless_data_dir }}/export"
     - "{{ paperless_data_dir }}/redis"
+    - "{{ paperless_data_dir }}/scripts"
     - "{{ ansible_env.HOME }}/paperless"
   tags: [paperless]
 
@@ -55,6 +56,22 @@
   delay: 10
   register: paperless_health
   until: paperless_health.status == 200
+  tags: [paperless]
+
+- name: "Déployer le script de pré-consommation (conversion Office → PDF)"
+  ansible.builtin.template:
+    src: pre-consume.sh.j2
+    dest: "{{ paperless_data_dir }}/scripts/pre-consume.sh"
+    mode: "0755"
+  notify: restart paperless
+  tags: [paperless]
+
+- name: "Déployer le script de post-consommation (ownership par sous-dossier)"
+  ansible.builtin.template:
+    src: post-consume.sh.j2
+    dest: "{{ paperless_data_dir }}/scripts/post-consume.sh"
+    mode: "0755"
+  notify: restart paperless
   tags: [paperless]
 
 - name: "Déployer le script de triage OCR"

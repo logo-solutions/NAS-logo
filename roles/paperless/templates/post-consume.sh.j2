@@ -1,0 +1,46 @@
+#!/bin/bash
+# Assigne owner + permissions selon le sous-dossier consume d'origine
+set -euo pipefail
+
+PAPERLESS_URL="http://localhost:8000"
+API_TOKEN="{{ paperless_api_token }}"
+CONSUME_DIR="/usr/src/paperless/consume"
+
+# Extraire le premier niveau de sous-dossier
+REL_PATH="${DOCUMENT_SOURCE_PATH#${CONSUME_DIR}/}"
+SUBFOLDER=$(echo "$REL_PATH" | cut -d'/' -f1)
+
+# Mapping sous-dossier → username + privé
+USERNAME=""
+PRIVATE="false"
+case "$SUBFOLDER" in
+{% for folder, cfg in paperless_consume_users.items() %}
+  {{ folder }}) USERNAME="{{ cfg.username }}"; PRIVATE="{{ cfg.private | lower }}" ;;
+{% endfor %}
+  *) exit 0 ;;
+esac
+
+# Résoudre l'ID utilisateur
+USER_RESPONSE=$(curl -sf -H "Authorization: Token ${API_TOKEN}" \
+  "${PAPERLESS_URL}/api/users/?username=${USERNAME}")
+USER_ID=$(echo "$USER_RESPONSE" | jq -r '.results[0].id // empty')
+
+if [ -z "$USER_ID" ]; then
+  echo "post-consume: utilisateur ${USERNAME} introuvable" >&2
+  exit 1
+fi
+
+# Permissions : privé = vide, partagé = laisse Paperless gérer
+if [ "$PRIVATE" = "true" ]; then
+  PERMS='{"view":{"users":[],"groups":[]},"change":{"users":[],"groups":[]}}'
+else
+  PERMS='{"view":{"users":[],"groups":[]},"change":{"users":[],"groups":[]}}'
+fi
+
+curl -sf -X PATCH \
+  -H "Authorization: Token ${API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{\"owner\": ${USER_ID}, \"set_permissions\": ${PERMS}}" \
+  "${PAPERLESS_URL}/api/documents/${DOCUMENT_ID}/" > /dev/null
+
+echo "post-consume: doc ${DOCUMENT_ID} (${SUBFOLDER}) → ${USERNAME} privé=${PRIVATE}"

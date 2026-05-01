@@ -1,0 +1,19 @@
+#!/bin/bash
+# Converti les fichiers Office en PDF avant ingestion Paperless
+set -e
+
+EXT=$(echo "${DOCUMENT_WORKING_PATH##*.}" | tr '[:upper:]' '[:lower:]')
+
+case "$EXT" in
+  doc|docx|ppt|pptx|odt|odp|xls|xlsx)
+    TMP_DIR=$(mktemp -d)
+    libreoffice --headless --convert-to pdf --outdir "$TMP_DIR" "$DOCUMENT_WORKING_PATH"
+    PDF_FILE=$(find "$TMP_DIR" -name "*.pdf" | head -1)
+    if [ -n "$PDF_FILE" ]; then
+      cp "$PDF_FILE" "$DOCUMENT_WORKING_PATH"
+    fi
+    rm -rf "$TMP_DIR"
+    ;;
+esac
+
+exit 0
