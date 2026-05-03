@@ -7,8 +7,9 @@ mac_user: "{{ ansible_user_id }}"
 ssd_mount_point: /Volumes/logousb/SSD/NAS-LOGO-VOLUME
 
 # HDD externe (données volumineuses froides, ajouté 2026-04-26)
+# NOTE: Actuellement tout est sur SSD. hdd_mount_point ne sera montée que si un disque externe est branchéé
 hdd_mount_point: /Volumes/NAS-LOGO-DATA
-hdd_nas_volume: /Volumes/NAS-LOGO-DATA/NAS-LOGO-VOLUME
+hdd_nas_volume: "{{ ssd_mount_point }}"  # Fallback SSD si HDD absente (2026-05-03)
 
 # Immich
 immich_version: release
@@ -35,6 +36,9 @@ grafana_dashboard_node_id: 1860
 
 # Sauvegarde
 backup_dir: "{{ ssd_mount_point }}/backups"
+backup_scripts_dir: "{{ ssd_mount_point }}/../Projects/NAS-logo/scripts/backup-restore"
+backup_log_dir: "{{ backup_scripts_dir }}/logs"
+backup_local_keep: 7
 hetzner_host: "88.99.49.100"
 hetzner_user: "{{ vault_hetzner_user }}"
 hetzner_remote_path: immich-backup
@@ -58,25 +62,61 @@ tesseract_bin: /opt/homebrew/bin/tesseract
 triage_bin: /usr/local/bin/nas-logo-triage.sh
 paperless_api_token: "{{ vault_paperless_api_token }}"
 paperless_users:
+  - username: loic-perso
+    password: "{{ vault_paperless_loic_perso_password }}"
+  - username: loic-immo
+    password: "{{ vault_paperless_loic_immo_password }}"
+  - username: loic-pro
+    password: "{{ vault_paperless_loic_pro_password }}"
   - username: alban
     password: "{{ vault_paperless_alban_password }}"
   - username: ilan
     password: "{{ vault_paperless_ilan_password }}"
+  - username: mahaut
+    password: "{{ vault_paperless_mahaut_password }}"
+  - username: alice-perso
+    password: "{{ vault_paperless_alice_perso_password }}"
+  - username: alice-prof
+    password: "{{ vault_paperless_alice_prof_password }}"
 
 # Mapping sous-dossier consume → owner Paperless (private=true : invisible aux autres)
 paperless_consume_users:
   loic-perso:
-    username: admin
+    username: loic-perso
     private: true
+    storage_path: "loic-perso/{created_year}/{title}"
+  loic-immo:
+    username: loic-immo
+    private: true
+    storage_path: "loic-immo/{created_year}/{title}"
+  loic-pro:
+    username: loic-pro
+    private: true
+    storage_path: "loic-pro/{created_year}/{title}"
   alban:
     username: alban
     private: true
+    storage_path: "alban/{created_year}/{title}"
   ilan:
     username: ilan
     private: true
+    storage_path: "ilan/{created_year}/{title}"
+  mahaut:
+    username: mahaut
+    private: true
+    storage_path: "mahaut/{created_year}/{title}"
+  alice-perso:
+    username: alice-perso
+    private: true
+    storage_path: "alice-perso/{created_year}/{title}"
+  alice-prof:
+    username: alice-prof
+    private: true
+    storage_path: "alice-prof/{created_year}/{title}"
   famille:
     username: admin
     private: false
+    storage_path: "famille/{created_year}/{title}"
 
 # SMB
 smb_share_name: "NAS-logo"
@@ -103,12 +143,30 @@ nas_ip: "100.113.214.55"
 
 # Immich — comptes famille
 immich_users:
+  - email: "loic-perso@nas.local"
+    name: "Loïc Perso"
+    password: "{{ vault_immich_loic_perso_password }}"
+  - email: "loic-immo@nas.local"
+    name: "Loïc Immo"
+    password: "{{ vault_immich_loic_immo_password }}"
+  - email: "loic-pro@nas.local"
+    name: "Loïc Pro"
+    password: "{{ vault_immich_loic_pro_password }}"
   - email: "alban@nas.local"
     name: "Alban"
     password: "{{ vault_immich_alban_password }}"
   - email: "ilan@nas.local"
     name: "Ilan"
     password: "{{ vault_immich_ilan_password }}"
+  - email: "mahaut@nas.local"
+    name: "Mahaut"
+    password: "{{ vault_immich_mahaut_password }}"
+  - email: "alice-perso@nas.local"
+    name: "Alice Perso"
+    password: "{{ vault_immich_alice_perso_password }}"
+  - email: "alice-prof@nas.local"
+    name: "Alice Prof"
+    password: "{{ vault_immich_alice_prof_password }}"
 
 # Gmail → Paperless / Immich
 gmail_user: "{{ vault_gmail_user }}"

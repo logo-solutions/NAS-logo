@@ -1,0 +1,46 @@
+docker exec paperless ls /usr/src/paperless/consume |wc -l
+docker restart paperless
+docker ps | grep paperless
+curl -s -u admin:NasLogo2026! "http://100.113.214.55:8010/api/documents/?page_size=1" | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'Docs: {d[\"count\"]}')")
+
+
+  # Voir les docs traités
+  curl -s -u admin:NasLogo2026! "http://100.113.214.55:8010/api/documents/?page_size=1" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['count'])"
+
+  # Voir les tags créés
+  curl -s -u admin:NasLogo2026! "http://100.113.214.55:8010/api/tags/" | python3 -c "import json,sys; d=json.load(sys.stdin); [print(t['name']) for t in d['results']]"
+
+  # Voir les fichiers encore en attente dans consume
+  docker exec paperless ls /usr/src/paperless/consume | wc -l
+
+  # Voir les logs du consumer
+  docker logs paperless --tail 50
+
+  # Forcer un scan du consume
+  docker exec paperless python manage.py document_consumer --oneshot
+
+  # Nombre de tâches en cours
+  docker exec paperless python manage.py celery inspect active
+
+
+⏺ D'après le docker-compose :
+
+  - "{{ hdd_nas_volume }}/paperless/consume:/usr/src/paperless/consume"
+
+  Le dossier d'entrée est sur le HDD :
+
+  /Volumes/NAS-LOGO-DATA/paperless/consume/
+
+  Monté dans le conteneur à /usr/src/paperless/consume.
+
+  Deux paramètres actifs qui jouent sur ce dossier :
+  - PAPERLESS_CONSUMER_RECURSIVE: true — les sous-dossiers sont aussi scannés
+  - PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS: true — le nom du sous-dossier devient un tag automatiquement (c'est pour ça que tu as Non triées comme tag dans ton
+  log)
+
+  Donc pour injecter des fichiers, il suffit de les copier dans /Volumes/NAS-LOGO-DATA/paperless/consume/ (ou un sous-dossier pour taguer automatiquement).
+  Paperless les détecte en temps réel via inotify.
+
+
+## réinitialiser mot de passe 
+ docker exec -it paperless python manage.py changepassword admin

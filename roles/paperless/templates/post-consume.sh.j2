@@ -1,5 +1,5 @@
 #!/bin/bash
-# Assigne owner + permissions selon le sous-dossier consume d'origine
+# Assigne owner + storage_path + permissions selon le sous-dossier consume
 set -euo pipefail
 
 PAPERLESS_URL="http://localhost:8000"
@@ -30,17 +30,25 @@ if [ -z "$USER_ID" ]; then
   exit 1
 fi
 
-# Permissions : privé = vide, partagé = laisse Paperless gérer
-if [ "$PRIVATE" = "true" ]; then
-  PERMS='{"view":{"users":[],"groups":[]},"change":{"users":[],"groups":[]}}'
+# Résoudre l'ID du storage path
+SP_RESPONSE=$(curl -sf -H "Authorization: Token ${API_TOKEN}" \
+  "${PAPERLESS_URL}/api/storage_paths/?name=${SUBFOLDER}")
+SP_ID=$(echo "$SP_RESPONSE" | jq -r '.results[0].id // empty')
+
+# Permissions vides = privé (seul le owner voit le document)
+PERMS='{"view":{"users":[],"groups":[]},"change":{"users":[],"groups":[]}}'
+
+# Construire le payload
+if [ -n "$SP_ID" ]; then
+  PAYLOAD="{\"owner\": ${USER_ID}, \"storage_path\": ${SP_ID}, \"set_permissions\": ${PERMS}}"
 else
-  PERMS='{"view":{"users":[],"groups":[]},"change":{"users":[],"groups":[]}}'
+  PAYLOAD="{\"owner\": ${USER_ID}, \"set_permissions\": ${PERMS}}"
 fi
 
 curl -sf -X PATCH \
   -H "Authorization: Token ${API_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d "{\"owner\": ${USER_ID}, \"set_permissions\": ${PERMS}}" \
+  -d "$PAYLOAD" \
   "${PAPERLESS_URL}/api/documents/${DOCUMENT_ID}/" > /dev/null
 
-echo "post-consume: doc ${DOCUMENT_ID} (${SUBFOLDER}) → ${USERNAME} privé=${PRIVATE}"
+echo "post-consume: doc ${DOCUMENT_ID} (${SUBFOLDER}) → owner=${USERNAME} sp=${SP_ID:-none} privé=${PRIVATE}"

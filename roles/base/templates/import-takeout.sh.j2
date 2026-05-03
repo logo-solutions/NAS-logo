@@ -53,12 +53,17 @@ if [ -d "$IMPORT_DIR" ]; then
   done
 fi
 
-IMMICH_INSTANCE_URL="$IMMICH_URL" IMMICH_API_KEY="$IMMICH_KEY" \
-  npx --yes @immich/cli@latest upload \
-    --recursive \
-    --album \
+immich-go \
+  --concurrent-tasks 4 \
+  --on-errors continue \
+  upload \
+    --server "$IMMICH_URL" \
+    --api-key "$IMMICH_KEY" \
+    --client-timeout 60m \
+    --no-ui \
+  from-google-photos \
     "$IMPORT_DIR" \
-    2>&1 | tee -a "$LOG_FILE"
+  2>&1 | tee -a "$LOG_FILE"
 
 EXIT_CODE=${PIPESTATUS[0]}
 

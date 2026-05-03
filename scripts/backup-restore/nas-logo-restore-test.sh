@@ -1,0 +1,156 @@
+#!/bin/bash
+# restore-test.sh — test de restauration NON-DESTRUCTIF sur conteneur PostgreSQL temporaire
+# Généré par Ansible (NAS-logo)
+# Usage: nas-logo-restore-test.sh [--service immich|paperless|n8n|all] [--dump /path/to.sql.gz]
+set -euo pipefail
+
+BACKUP_DIR="/Volumes/logousb/SSD/NAS-LOGO-VOLUME/backups"
+LOG_DIR="/Volumes/logousb/SSD/NAS-LOGO-VOLUME/../Projects/NAS-logo/scripts/backup-restore/logs"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/restore-test-$(date +%Y%m%d-%H%M%S).log"
+DOCKER_BIN="/opt/homebrew/bin/docker"
+CONTAINER_NAME="restore_test_pg_$$"
+TEST_PORT=$((15432 + RANDOM % 100))
+SERVICE="all"
+DUMP_FILE=""
+
+cleanup() {
+  echo "==> Nettoyage du conteneur de test..." | tee -a "$LOG_FILE" >&2
+  $DOCKER_BIN rm -f "$CONTAINER_NAME" 2>/dev/null || true
+}
+trap cleanup EXIT
+
+notify() {
+  local title="$1" msg="$2" priority="${3:-default}"
+  curl -s -H "Title: $title" -H "Priority: $priority" -d "$msg" \
+    "http://localhost:8090/nas-logo" || true
+}
+
+test_restore() {
+  local service="$1" dump_file="$2"
+
+  [[ -z "$dump_file" ]] && {
+    echo "AVERTISSEMENT : aucun dump $service trouvé." | tee -a "$LOG_FILE" >&2
+    return 1
+  }
+
+  echo "==> Test restauration $service : $dump_file" | tee -a "$LOG_FILE" >&2
+
+  # Restaurer le dump
+  if ! gunzip -c "$dump_file" | \
+       $DOCKER_BIN exec -i "$CONTAINER_NAME" psql \
+       --username=postgres --dbname=postgres \
+       2>&1 | tee -a "$LOG_FILE" >/dev/null; then
+    echo "ERREUR : restauration $service échouée" | tee -a "$LOG_FILE" >&2
+    return 1
+  fi
+
+  # Vérifications spécifiques au service
+  case "$service" in
+    immich)
+      ASSETS=$($DOCKER_BIN exec "$CONTAINER_NAME" psql -U postgres -t -c \
+        "SELECT COUNT(*) FROM public.assets;" 2>/dev/null || echo "0")
+      TABLES=$($DOCKER_BIN exec "$CONTAINER_NAME" psql -U postgres -t -c \
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public';" 2>/dev/null || echo "0")
+      echo "==> Immich : $ASSETS assets, $TABLES tables" | tee -a "$LOG_FILE" >&2
+      [[ $TABLES -lt 20 ]] && { echo "ERREUR : Immich < 20 tables" | tee -a "$LOG_FILE" >&2; return 1; }
+      ;;
+    paperless)
+      DOCS=$($DOCKER_BIN exec "$CONTAINER_NAME" psql -U postgres -t -c \
+        "SELECT COUNT(*) FROM public.documents_document;" 2>/dev/null || echo "0")
+      TABLES=$($DOCKER_BIN exec "$CONTAINER_NAME" psql -U postgres -t -c \
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public';" 2>/dev/null || echo "0")
+      echo "==> Paperless : $DOCS documents, $TABLES tables" | tee -a "$LOG_FILE" >&2
+      [[ $TABLES -lt 10 ]] && { echo "ERREUR : Paperless < 10 tables" | tee -a "$LOG_FILE" >&2; return 1; }
+      ;;
+    n8n)
+      WORKFLOWS=$($DOCKER_BIN exec "$CONTAINER_NAME" psql -U postgres -t -c \
+        "SELECT COUNT(*) FROM public.workflow_entity;" 2>/dev/null || echo "0")
+      TABLES=$($DOCKER_BIN exec "$CONTAINER_NAME" psql -U postgres -t -c \
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public';" 2>/dev/null || echo "0")
+      echo "==> n8n : $WORKFLOWS workflows, $TABLES tables" | tee -a "$LOG_FILE" >&2
+      [[ $TABLES -lt 15 ]] && { echo "ERREUR : n8n < 15 tables" | tee -a "$LOG_FILE" >&2; return 1; }
+      ;;
+  esac
+
+  echo "==> ✓ $service : PASS" | tee -a "$LOG_FILE" >&2
+  return 0
+}
+
+usage() {
+  cat >&2 <<EOF
+Usage: $(basename "$0") [--service SERVICE] [--dump PATH]
+
+SERVICE : immich | paperless | n8n | all (défaut: all)
+--dump   : chemin explicit du dump à tester (ex: /backups/immich-db-*.sql.gz)
+EOF
+  exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --service) SERVICE="$2"; shift 2 ;;
+    --dump) DUMP_FILE="$2"; shift 2 ;;
+    -h|--help) usage ;;
+    *) echo "Option inconnue: $1" >&2; usage ;;
+  esac
+done
+
+echo "==> Test de restauration démarré ($(date))" | tee "$LOG_FILE" >&2
+echo "==> Conteneur test : $CONTAINER_NAME (port $TEST_PORT)" | tee -a "$LOG_FILE" >&2
+
+# Lancer conteneur PostgreSQL test
+echo "==> Démarrage PostgreSQL test..." | tee -a "$LOG_FILE" >&2
+$DOCKER_BIN run -d --name "$CONTAINER_NAME" \
+  -p "$TEST_PORT:5432" \
+  -e POSTGRES_PASSWORD=test \
+  postgres:16-alpine >/dev/null 2>&1
+
+# Attendre qu'il soit prêt
+echo "==> Attente PostgreSQL ready..." | tee -a "$LOG_FILE" >&2
+for i in $(seq 1 30); do
+  if $DOCKER_BIN exec "$CONTAINER_NAME" pg_isready -U postgres &>/dev/null; then
+    echo "==> PostgreSQL ready" | tee -a "$LOG_FILE" >&2
+    break
+  fi
+  [[ $i -eq 30 ]] && { echo "ERREUR : PostgreSQL timeout" | tee -a "$LOG_FILE" >&2; exit 1; }
+  sleep 1
+done
+
+# Tests des services
+FAILED=0
+case "$SERVICE" in
+  immich|all)
+    DUMP=$(ls -t "$BACKUP_DIR"/immich-db-*.sql.gz 2>/dev/null | head -1 || echo "")
+    test_restore "immich" "$DUMP" || FAILED=$((FAILED + 1))
+    [[ "$SERVICE" == "immich" ]] && [[ $FAILED -eq 0 ]] && exit 0
+    ;;
+esac
+
+case "$SERVICE" in
+  paperless|all)
+    DUMP=$(ls -t "$BACKUP_DIR"/paperless-db-*.sql.gz 2>/dev/null | head -1 || echo "")
+    test_restore "paperless" "$DUMP" || FAILED=$((FAILED + 1))
+    [[ "$SERVICE" == "paperless" ]] && [[ $FAILED -eq 0 ]] && exit 0
+    ;;
+esac
+
+case "$SERVICE" in
+  n8n|all)
+    DUMP=$(ls -t "$BACKUP_DIR"/n8n-db-*.sql.gz 2>/dev/null | head -1 || echo "")
+    test_restore "n8n" "$DUMP" || FAILED=$((FAILED + 1))
+    [[ "$SERVICE" == "n8n" ]] && [[ $FAILED -eq 0 ]] && exit 0
+    ;;
+esac
+
+echo "==> Test de restauration terminé ($(date))" | tee -a "$LOG_FILE" >&2
+
+if [[ $FAILED -eq 0 ]]; then
+  echo "==> ✓ TOUS LES TESTS PASS" | tee -a "$LOG_FILE" >&2
+  notify "NAS-logo Restore-test OK" "Tous les tests PASS. Voir $LOG_FILE." "low"
+  exit 0
+else
+  echo "==> ✗ $FAILED TEST(S) ÉCHOUÉ(S)" | tee -a "$LOG_FILE" >&2
+  notify "NAS-logo Restore-test FAIL" "$FAILED test(s) échoué(s). Voir $LOG_FILE." "urgent"
+  exit 1
+fi

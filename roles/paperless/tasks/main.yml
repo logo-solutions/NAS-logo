@@ -103,6 +103,28 @@
   changed_when: paperless_user_result.status == 201
   tags: [paperless]
 
+- name: "Créer les chemins de stockage Paperless"
+  ansible.builtin.uri:
+    url: "http://localhost:{{ paperless_port }}/api/storage_paths/"
+    method: POST
+    headers:
+      Authorization: "Token {{ paperless_api_token }}"
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      name: "{{ item.key }}"
+      path: "{{ item.value.storage_path }}"
+      matching_algorithm: 0
+      match: ""
+      is_insensitive: true
+    status_code: [200, 201, 400]
+  loop: "{{ paperless_consume_users | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  register: storage_path_result
+  changed_when: storage_path_result.status == 201
+  tags: [paperless]
+
 - name: "Déployer le script d'import one-shot"
   ansible.builtin.template:
     src: import-scans.sh.j2

@@ -3,11 +3,11 @@
 # Généré par Ansible (NAS-logo)
 set -euo pipefail
 
-NTFY_URL="http://localhost:{{ ntfy_port }}/{{ ntfy_topic }}"
-LOG_DIR="{{ backup_log_dir }}"
+NTFY_URL="http://localhost:8090/nas-logo"
+LOG_DIR="/Volumes/logousb/SSD/NAS-LOGO-VOLUME/../Projects/NAS-logo/scripts/backup-restore/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/backup-$(date +%Y%m%d).log"
-RCLONE="{{ rclone_bin | default('/opt/homebrew/bin/rclone') }}"
+RCLONE="/opt/homebrew/bin/rclone"
 START_TIME=$(date +%s)
 
 notify() {
@@ -39,7 +39,7 @@ fi
 
 # 2. Vérification espace disque
 echo "==> Vérification espace disque..." | tee -a "$LOG_FILE" >&2
-FREE_GB=$(df -g "{{ ssd_mount_point }}" | awk 'NR==2{print $4}')
+FREE_GB=$(df -g "/Volumes/logousb/SSD/NAS-LOGO-VOLUME" | awk 'NR==2{print $4}')
 if [ "$FREE_GB" -lt 5 ]; then
   notify "NAS-logo Espace critique" "Seulement ${FREE_GB}Go libres sur SSD — sync Hetzner ignorée." "urgent"
   exit 1
@@ -49,7 +49,7 @@ echo "==> Espace OK : ${FREE_GB}Go libres" | tee -a "$LOG_FILE" >&2
 # 3. Sync SSD vers Hetzner chiffré (DB, backups, index, services)
 # Exclusions : thumbs, encoded-video (reconstruits), meilisearch, monitoring (rebuilt)
 echo "==> Sync SSD vers Hetzner..." | tee -a "$LOG_FILE" >&2
-$RCLONE sync "{{ ssd_mount_point }}" hetzner-crypt:current/ssd \
+$RCLONE sync "/Volumes/logousb/SSD/NAS-LOGO-VOLUME" hetzner-crypt:current/ssd \
   --backup-dir "hetzner-crypt:versions/$(date +%Y%m%d)/ssd" \
   --exclude "immich/thumbs/**" \
   --exclude "immich/encoded-video/**" \
@@ -64,7 +64,7 @@ $RCLONE sync "{{ ssd_mount_point }}" hetzner-crypt:current/ssd \
 # 4. Sync HDD vers Hetzner chiffré (fichiers Immich, Paperless, documents)
 # Exclusions : thumbs, encoded-video (reconstruits sur SSD), fichiers système
 echo "==> Sync HDD vers Hetzner..." | tee -a "$LOG_FILE" >&2
-$RCLONE sync "{{ hdd_nas_volume }}" hetzner-crypt:current/hdd \
+$RCLONE sync "/Volumes/logousb/SSD/NAS-LOGO-VOLUME" hetzner-crypt:current/hdd \
   --backup-dir "hetzner-crypt:versions/$(date +%Y%m%d)/hdd" \
   --exclude "immich/thumbs/**" \
   --exclude "immich/encoded-video/**" \
@@ -78,11 +78,11 @@ $RCLONE sync "{{ hdd_nas_volume }}" hetzner-crypt:current/hdd \
   --min-age 5m
 
 # 5. Rétention : purger les anciennes versions (garder min N versions)
-echo "==> Application de la rétention (min {{ backup_daily_keep }} versions)..." | tee -a "$LOG_FILE" >&2
+echo "==> Application de la rétention (min 7 versions)..." | tee -a "$LOG_FILE" >&2
 for bucket in ssd hdd; do
-  echo "==> Purge versions $bucket > {{ backup_daily_keep }} jours..." | tee -a "$LOG_FILE" >&2
+  echo "==> Purge versions $bucket > 7 jours..." | tee -a "$LOG_FILE" >&2
   $RCLONE lsd hetzner-crypt:versions 2>/dev/null | awk '{print $NF}' | sort -r | \
-    tail -n +$(( {{ backup_daily_keep }} + 1 )) | while read dir; do
+    tail -n +$(( 7 + 1 )) | while read dir; do
       if $RCLONE lsd "hetzner-crypt:versions/$dir/$bucket" 2>/dev/null | grep -q .; then
         echo "==> Purge version : $dir/$bucket" | tee -a "$LOG_FILE" >&2
         $RCLONE purge "hetzner-crypt:versions/$dir/$bucket" --log-file "$LOG_FILE" || true

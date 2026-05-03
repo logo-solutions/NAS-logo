@@ -11,12 +11,12 @@ set -euo pipefail
 
 RCLONE=/opt/homebrew/bin/rclone
 DOCKER=/opt/homebrew/bin/docker
-DOCKER_HOST="unix:///Users/{{ mac_user }}/.colima/default/docker.sock"
+DOCKER_HOST="unix:///Users/logo/.colima/default/docker.sock"
 export DOCKER_HOST
 
-SSD="{{ ssd_mount_point }}"
-BACKUP_DIR="{{ backup_dir }}"
-NTFY_URL="http://localhost:{{ ntfy_port }}/{{ ntfy_topic }}"
+SSD="/Volumes/logousb/SSD/NAS-LOGO-VOLUME"
+BACKUP_DIR="/Volumes/logousb/SSD/NAS-LOGO-VOLUME/backups"
+NTFY_URL="http://localhost:8090/nas-logo"
 LOG_DIR="$HOME/Library/Logs/nas-logo"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/restore.log"
@@ -114,12 +114,12 @@ else
 
   if [[ "$DRY_RUN" == "false" ]]; then
     echo "==> Suppression du répertoire PostgreSQL (réinitialisation propre)..." | tee -a "$LOG_FILE"
-    rm -rf "{{ ssd_mount_point }}/immich-db"
+    rm -rf "/Volumes/logousb/SSD/NAS-LOGO-VOLUME/immich-db"
     echo "==> Démarrage PostgreSQL seul..." | tee -a "$LOG_FILE"
     $DOCKER compose -f ~/immich/docker-compose.yml up -d database 2>&1 | tee -a "$LOG_FILE"
     echo "==> Attente PostgreSQL prêt..." | tee -a "$LOG_FILE"
     for i in $(seq 1 30); do
-      STATUS=$($DOCKER inspect --format='{% raw %}{{.State.Status}}{% endraw %}' immich_postgres 2>/dev/null || echo "unknown")
+      STATUS=$($DOCKER inspect --format='{{.State.Status}}' immich_postgres 2>/dev/null || echo "unknown")
       if [[ "$STATUS" == "running" ]]; then
         $DOCKER exec immich_postgres pg_isready -U immich &>/dev/null && break
       fi
@@ -149,7 +149,7 @@ else
     $DOCKER start paperless_db 2>&1 | tee -a "$LOG_FILE"
     echo "==> Attente PostgreSQL Paperless prêt..." | tee -a "$LOG_FILE"
     for i in $(seq 1 30); do
-      STATUS=$($DOCKER inspect --format='{% raw %}{{.State.Status}}{% endraw %}' paperless_db 2>/dev/null || echo "unknown")
+      STATUS=$($DOCKER inspect --format='{{.State.Status}}' paperless_db 2>/dev/null || echo "unknown")
       if [[ "$STATUS" == "running" ]]; then
         $DOCKER exec paperless_db pg_isready -U paperless &>/dev/null && break
       fi
@@ -157,8 +157,8 @@ else
     done
     echo "==> Restauration PostgreSQL Paperless..." | tee -a "$LOG_FILE"
     gunzip -c "$PAPERLESS_DUMP" | $DOCKER exec -i paperless_db psql \
-      --username={{ paperless_db_user }} \
-      --dbname={{ paperless_db_name }} \
+      --username=paperless \
+      --dbname=paperless \
       2>&1 | tee -a "$LOG_FILE"
   else
     echo "==> [dry-run] Restaurerait Paperless : $PAPERLESS_DUMP" | tee -a "$LOG_FILE"
@@ -178,7 +178,7 @@ else
     $DOCKER start n8n_db 2>&1 | tee -a "$LOG_FILE"
     echo "==> Attente PostgreSQL n8n prêt..." | tee -a "$LOG_FILE"
     for i in $(seq 1 30); do
-      STATUS=$($DOCKER inspect --format='{% raw %}{{.State.Status}}{% endraw %}' n8n_db 2>/dev/null || echo "unknown")
+      STATUS=$($DOCKER inspect --format='{{.State.Status}}' n8n_db 2>/dev/null || echo "unknown")
       if [[ "$STATUS" == "running" ]]; then
         $DOCKER exec n8n_db pg_isready -U n8n &>/dev/null && break
       fi

@@ -1,13 +1,15 @@
 ---
 # roles/sauvegarde — rclone + dump PostgreSQL + LaunchAgent cron
 
-- name: "Créer les répertoires de sauvegarde"
+- name: "Créer les répertoires de sauvegarde et scripts"
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     mode: "0700"
   loop:
     - "{{ backup_dir }}"
+    - "{{ backup_scripts_dir }}"
+    - "{{ backup_log_dir }}"
     - "{{ ansible_env.HOME }}/.config/rclone"
   tags: [sauvegarde]
 
@@ -22,26 +24,52 @@
 - name: "Déployer le script de dump PostgreSQL"
   ansible.builtin.template:
     src: dump_db.sh.j2
-    dest: /usr/local/bin/nas-logo-dump-db.sh
+    dest: "{{ backup_scripts_dir }}/nas-logo-dump-db.sh"
     mode: "0755"
-  become: true
   tags: [sauvegarde]
 
 - name: "Déployer le script de sauvegarde rclone"
   ansible.builtin.template:
     src: backup.sh.j2
-    dest: /usr/local/bin/nas-logo-backup.sh
+    dest: "{{ backup_scripts_dir }}/nas-logo-backup.sh"
     mode: "0755"
-  become: true
   tags: [sauvegarde, rclone]
+
+- name: "Déployer le script de sauvegarde ciblée"
+  ansible.builtin.template:
+    src: backup-cible.sh.j2
+    dest: "{{ backup_scripts_dir }}/nas-logo-backup-cible.sh"
+    mode: "0755"
+  tags: [sauvegarde]
+
+- name: "Déployer le script de test de restauration"
+  ansible.builtin.template:
+    src: restore-test.sh.j2
+    dest: "{{ backup_scripts_dir }}/nas-logo-restore-test.sh"
+    mode: "0755"
+  tags: [sauvegarde]
 
 - name: "Déployer le script de restauration"
   ansible.builtin.template:
     src: restore.sh.j2
-    dest: /usr/local/bin/nas-logo-restore.sh
+    dest: "{{ backup_scripts_dir }}/nas-logo-restore.sh"
     mode: "0755"
-  become: true
   tags: [sauvegarde, restore]
+
+- name: "Créer symlinks dans /usr/local/bin"
+  ansible.builtin.file:
+    src: "{{ backup_scripts_dir }}/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    state: link
+    force: true
+  become: true
+  loop:
+    - nas-logo-dump-db.sh
+    - nas-logo-backup.sh
+    - nas-logo-backup-cible.sh
+    - nas-logo-restore-test.sh
+    - nas-logo-restore.sh
+  tags: [sauvegarde]
 
 - name: "Déployer le LaunchAgent de sauvegarde quotidienne"
   ansible.builtin.template:
