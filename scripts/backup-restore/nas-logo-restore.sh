@@ -15,7 +15,7 @@ DOCKER_HOST="unix:///Users/logo/.colima/default/docker.sock"
 export DOCKER_HOST
 
 SSD="/Volumes/logousb/SSD/NAS-LOGO-VOLUME"
-BACKUP_DIR="/Volumes/logousb/SSD/NAS-LOGO-VOLUME/backups"
+BACKUP_DIR="/Volumes/NAS-LOGO-DATA/NAS-LOGO-VOLUME/backups"
 NTFY_URL="http://localhost:8090/nas-logo"
 LOG_DIR="$HOME/Library/Logs/nas-logo"
 mkdir -p "$LOG_DIR"

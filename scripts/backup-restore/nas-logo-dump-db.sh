@@ -3,7 +3,7 @@
 # Généré par Ansible (NAS-logo)
 set -euo pipefail
 
-BACKUP_DIR="/Volumes/logousb/SSD/NAS-LOGO-VOLUME/backups"
+BACKUP_DIR="/Volumes/NAS-LOGO-DATA/NAS-LOGO-VOLUME/backups"
 LOG_DIR="/Volumes/logousb/SSD/NAS-LOGO-VOLUME/../Projects/NAS-logo/scripts/backup-restore/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/dump-$(date +%Y%m%d-%H%M%S).log"

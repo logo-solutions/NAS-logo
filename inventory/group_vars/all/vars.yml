@@ -35,7 +35,7 @@ grafana_dashboard_cadvisor_id: 14282
 grafana_dashboard_node_id: 1860
 
 # Sauvegarde
-backup_dir: "{{ ssd_mount_point }}/backups"
+backup_dir: "{{ hdd_mount_point }}/NAS-LOGO-VOLUME/backups"
 backup_scripts_dir: "{{ ssd_mount_point }}/../Projects/NAS-logo/scripts/backup-restore"
 backup_log_dir: "{{ backup_scripts_dir }}/logs"
 backup_local_keep: 7
