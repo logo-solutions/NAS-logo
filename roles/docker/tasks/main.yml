@@ -188,7 +188,7 @@
     msg: "NFS daemon processes: {{ nfs_process.stdout }}"
   tags: [docker, nfs]
 
-- name: "Configurer NFS mount dans Colima VM"
+- name: "Configurer NFS mount dans Colima VM (optionnel — NFS export peut être bloqué par firewall macOS)"
   ansible.builtin.shell:
     cmd: |
       /opt/homebrew/bin/colima ssh << 'EOF'
@@ -221,6 +221,7 @@
   register: nfs_mount_result
   changed_when: "nfs_mount_result.rc == 0"
   delegate_to: localhost
+  ignore_errors: true
   tags: [docker, nfs]
 
 - name: "Afficher résultat mount NFS"
