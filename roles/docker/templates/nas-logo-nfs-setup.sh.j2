@@ -1,0 +1,24 @@
+#!/bin/sh
+# Script: configurer NFS mount dans Colima VM
+# Exécuté dans un container Docker avec accès à la VM
+
+set -e
+
+NFS_MOUNT_PATH="${NFS_MOUNT_PATH:-/mnt/photos}"
+HOST_IP="${HOST_IP:-host.lima.internal}"
+
+echo "=== Configuration NFS dans Colima ==="
+echo "Mount path: $NFS_MOUNT_PATH"
+echo "NFS server: $HOST_IP"
+
+# Installer NFS client dans la VM
+apk add --no-cache nfs-utils
+
+# Créer le répertoire de montage
+mkdir -p "$NFS_MOUNT_PATH"
+
+# Ajouter au /etc/fstab pour persistance (optionnel)
+# echo "$HOST_IP:/Volumes/NAS-LOGO-DATA $NFS_MOUNT_PATH nfs defaults,nfsvers=3,soft,timeo=10,retrans=3 0 0" >> /etc/fstab
+
+echo "✅ NFS client installé et répertoire créé: $NFS_MOUNT_PATH"
+echo "   Montez manuellement ou via script: mount -t nfs $HOST_IP:/Volumes/NAS-LOGO-DATA $NFS_MOUNT_PATH"

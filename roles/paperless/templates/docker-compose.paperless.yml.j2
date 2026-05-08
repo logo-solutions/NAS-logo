@@ -45,7 +45,13 @@ services:
     volumes:
       - "{{ paperless_data_dir }}/data:/usr/src/paperless/data"
       - "{{ paperless_data_dir }}/media:/usr/src/paperless/media"
+{% if use_nfs %}
+      # NFS optimization: consume directory via NFS mount
+      - "{{ nfs_mount_path }}/NAS-LOGO-VOLUME/paperless/consume:/usr/src/paperless/consume"
+{% else %}
+      # Fallback: bind mount direct macOS
       - "{{ hdd_nas_volume }}/paperless/consume:/usr/src/paperless/consume"
+{% endif %}
       - "{{ paperless_data_dir }}/export:/usr/src/paperless/export"
       - "{{ paperless_data_dir }}/scripts:/usr/src/paperless/scripts:ro"
     environment:

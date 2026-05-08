@@ -10,11 +10,14 @@
 
 | Élément | Chemin |
 |---------|--------|
-| **SOURCE** | `/Volumes/NAS-LOGO-DATA/NAS-LOGO-VOLUME/immich/upload/` |
-| **CIBLE** | `/Volumes/NAS-LOGO-DATA/NAS-LOGO-VOLUME/personnes/loic-perso/immich/library/` |
-| **Fichiers à importer** | 52,5k photos/vidéos |
+| **SOURCE** (Takeouts) | `/Volumes/NAS-LOGO-DATA/NAS-LOGO-VOLUME/immich/upload/` |
+| **CIBLE** (Assets stockés) | `/Volumes/NAS-LOGO-DATA/NAS-LOGO-VOLUME/personnes/loic-perso/immich/upload/` |
+| **Vignettes** | `/Volumes/NAS-LOGO-DATA/NAS-LOGO-VOLUME/personnes/loic-perso/immich/thumbs/` |
+| **Fichiers à importer** | 874 photos/vidéos (83,8k fichiers) |
 | **Immich server** | `http://localhost:2283` |
 | **User Immich** | loicgourmelon@gmail.com / "Loic Perso" (admin) |
+
+**Note** : Structure standard Immich — les assets vont dans `upload/`, les vignettes dans `thumbs/`, etc.
 
 ---
 
@@ -162,6 +165,33 @@ echo "CIBLE:" && find /Volumes/NAS-LOGO-DATA/NAS-LOGO-VOLUME/personnes/loic-pers
 ```bash
 tail -200 ~/Library/Caches/immich-go/immich-go_2026-05-07_*.log | grep -i "error\|failed\|panic"
 ```
+
+---
+
+## Session import (2026-05-07)
+
+### Tentative 1 : Dry-run + Upload partiel (06:45–06:56)
+- ✅ 355 fichiers uploadés avec succès
+- ⚠️ 10 erreurs serveur
+- 🔴 507 assets "pending" (coupure SSH)
+
+### Tentative 2 : Config mount library/ (incomplet)
+- 🔴 Immich crée `/upload/`, `/thumbs/` EN DEDANS de `/library/`
+- Revenu à mount parent (structure standard)
+
+### Tentative 3 : Import final (07:16–07:20)
+- Process lancé à 07:16 avec concurrent-tasks=8
+- ✅ 183 uploadés en 30 min (trop lent)
+- Relancé à 07:20 avec concurrent-tasks=32 mais bug immich-go (blocage après flags)
+
+### RÉSULTAT FINAL (2026-05-07)
+- ✅ **823 assets importés** (94% du total)
+- Stockés dans : `/Volumes/NAS-LOGO-DATA/NAS-LOGO-VOLUME/personnes/loic-perso/immich/upload/`
+- Vignettes : 730 générées dans `thumbs/`
+- Vidéos transcodées : 613 MB dans `encoded-video/`
+- ⚠️ 51 assets manquants (5%) — immich-go a un bug (blocage après flags)
+
+**Import réussi malgré les obstacles** — structure Immich standard respectée
 
 ---
 

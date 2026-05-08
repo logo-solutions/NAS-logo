@@ -148,3 +148,73 @@
   until: docker_info.rc == 0
   changed_when: false
   tags: [docker]
+
+- name: "Déployer script NFS configuration"
+  ansible.builtin.template:
+    src: nas-logo-nfs-setup.sh.j2
+    dest: /usr/local/bin/nas-logo-nfs-setup.sh
+    mode: "0755"
+  become: true
+  tags: [docker, nfs]
+
+- name: "Configurer NFS export sur macOS (/etc/exports)"
+  ansible.builtin.template:
+    src: exports.j2
+    dest: /etc/exports.nas-logo
+    mode: "0644"
+  become: true
+  tags: [docker, nfs]
+
+- name: "Merger export NFS dans /etc/exports"
+  ansible.builtin.shell:
+    cmd: |
+      grep -v "NAS-LOGO" /etc/exports > /tmp/exports.tmp 2>/dev/null || true
+      cat /etc/exports.nas-logo >> /tmp/exports.tmp
+      sudo mv /tmp/exports.tmp /etc/exports
+  become: true
+  changed_when: true
+  tags: [docker, nfs]
+
+- name: "Activer et redémarrer NFS"
+  ansible.builtin.shell:
+    cmd: |
+      sudo nfsd enable
+      sudo nfsd restart
+  changed_when: true
+  tags: [docker, nfs]
+
+- name: "Vérifier NFS actif"
+  ansible.builtin.command:
+    cmd: "showmount -e localhost"
+  register: nfs_exports
+  changed_when: false
+  tags: [docker, nfs]
+
+- name: "Afficher exports NFS"
+  ansible.builtin.debug:
+    var: nfs_exports.stdout
+  tags: [docker, nfs]
+
+- name: "Configurer NFS mount dans Colima VM (via colima ssh)"
+  ansible.builtin.shell:
+    cmd: |
+      colima ssh << 'EOF'
+      # Installer NFS client si absent
+      ! command -v mount.nfs &>/dev/null && sudo apt-get update && sudo apt-get install -y nfs-common
+
+      # Créer répertoire de montage
+      sudo mkdir -p /mnt/photos
+
+      # Monter NFS (host.lima.internal = macOS host)
+      sudo umount /mnt/photos 2>/dev/null || true
+      sudo mount -t nfs -o vers=3,soft,timeo=10,retrans=3 host.lima.internal:/Volumes/NAS-LOGO-DATA /mnt/photos
+
+      # Vérifier le mount
+      mount | grep /mnt/photos && echo "✅ NFS mounted successfully"
+
+      # Ajouter à fstab pour persistance
+      echo "host.lima.internal:/Volumes/NAS-LOGO-DATA /mnt/photos nfs vers=3,soft,timeo=10,retrans=3,_netdev 0 0" | \
+        sudo tee -a /etc/fstab > /dev/null
+      EOF
+  changed_when: true
+  tags: [docker, nfs]

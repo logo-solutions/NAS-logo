@@ -8,9 +8,17 @@ services:
     container_name: immich_server
     image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION}
     volumes:
+      # Immich crée sa structure sous UPLOAD_LOCATION: upload/, thumbs/, encoded-video/, etc.
+      # NFS optimization (2026-05-08): utilisé /mnt/photos (NFS mount dans Colima) au lieu de virtiofs bind mount
       - ${UPLOAD_LOCATION}:/usr/src/app/upload
       - /etc/localtime:/etc/localtime:ro
+{% if use_nfs %}
+      # NFS mount (via Colima + macOS export)
+      - {{ nfs_mount_path }}/NAS-LOGO-VOLUME/personnes:/usr/src/app/external:ro
+{% else %}
+      # Fallback: bind mount direct macOS (virtiofs)
       - {{ ssd_mount_point }}/personnes:/usr/src/app/external:ro
+{% endif %}
     env_file: .env
     ports:
       - "{{ immich_port }}:{{ immich_port }}"
