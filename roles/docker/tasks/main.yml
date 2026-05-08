@@ -149,14 +149,6 @@
   changed_when: false
   tags: [docker]
 
-- name: "Déployer script NFS configuration"
-  ansible.builtin.template:
-    src: nas-logo-nfs-setup.sh.j2
-    dest: /usr/local/bin/nas-logo-nfs-setup.sh
-    mode: "0755"
-  become: true
-  tags: [docker, nfs]
-
 - name: "Configurer NFS export sur macOS (/etc/exports)"
   ansible.builtin.template:
     src: exports.j2
@@ -164,6 +156,7 @@
     mode: "0644"
     backup: true
   become: true
+  register: nfs_exports_config
   tags: [docker, nfs]
 
 - name: "Activer et redémarrer NFS"
@@ -172,64 +165,44 @@
       nfsd enable
       nfsd restart
   become: true
+  when: nfs_exports_config.changed
   changed_when: true
   tags: [docker, nfs]
 
-- name: "Vérifier NFS en cours d'exécution"
-  ansible.builtin.shell:
-    cmd: "ps aux | grep -E 'nfsd|nfs' | grep -v grep | wc -l"
-  register: nfs_process
-  changed_when: false
-  delegate_to: localhost
+- name: "Créer répertoire scripts Colima"
+  ansible.builtin.file:
+    path: "{{ ansible_env.HOME }}/colima-scripts"
+    state: directory
+    mode: "0755"
   tags: [docker, nfs]
 
-- name: "Afficher statut NFS"
-  ansible.builtin.debug:
-    msg: "NFS daemon processes: {{ nfs_process.stdout }}"
-  tags: [docker, nfs]
-
-- name: "Configurer NFS mount dans Colima VM (optionnel — NFS export peut être bloqué par firewall macOS)"
-  ansible.builtin.shell:
-    cmd: |
-      /opt/homebrew/bin/colima ssh << 'EOF'
+- name: "Déployer script NFS mount (via virtiofs $HOME)"
+  ansible.builtin.copy:
+    content: |
+      #!/bin/sh
       set -e
-      echo "=== Setup NFS mount dans Colima ==="
-
-      # Installer NFS client
-      if ! command -v mount.nfs &>/dev/null; then
-        echo "Installing nfs-common..."
-        sudo apt-get update >/dev/null 2>&1
-        sudo apt-get install -y nfs-common >/dev/null 2>&1
-      fi
-
-      # Créer et monter NFS
-      echo "Creating /mnt/photos..."
-      sudo mkdir -p /mnt/photos
-
-      echo "Mounting NFS..."
-      sudo umount /mnt/photos 2>/dev/null || true
-      sudo mount -t nfs -o soft,timeo=10,retrans=3 host.lima.internal:/Volumes/NAS-LOGO-DATA /mnt/photos
-
-      # Vérifier
-      echo "✅ NFS mounted:"
+      echo "=== Montage NFS dans Colima ==="
+      command -v mount.nfs >/dev/null 2>&1 || (apt-get update -qq && apt-get install -y -qq nfs-common)
+      mkdir -p /mnt/photos
+      umount /mnt/photos 2>/dev/null || true
+      echo "Montage NFS depuis {{ nfs_server }}..."
+      mount -t nfs -o soft,timeo=30 {{ nfs_server }}:/Volumes/NAS-LOGO-DATA /mnt/photos
+      echo "✅ NFS monté:"
       mount | grep /mnt/photos
+      grep -q "/mnt/photos" /etc/fstab || echo "{{ nfs_server }}:/Volumes/NAS-LOGO-DATA /mnt/photos nfs soft,timeo=30,_netdev 0 0" >> /etc/fstab
+    dest: "{{ ansible_env.HOME }}/colima-scripts/mount-nfs.sh"
+    mode: "0755"
+  tags: [docker, nfs]
 
-      # Ajouter à fstab
-      grep -q "/mnt/photos" /etc/fstab || echo "host.lima.internal:/Volumes/NAS-LOGO-DATA /mnt/photos nfs soft,timeo=10,retrans=3,_netdev 0 0" | sudo tee -a /etc/fstab >/dev/null
-      echo "✅ Done"
-      EOF
+- name: "Exécuter montage NFS dans Colima VM"
+  ansible.builtin.command:
+    cmd: "/opt/homebrew/bin/colima ssh /Users/{{ ansible_user_id }}/colima-scripts/mount-nfs.sh"
   register: nfs_mount_result
-  changed_when: "nfs_mount_result.rc == 0"
+  changed_when: nfs_mount_result.rc == 0
   delegate_to: localhost
-  ignore_errors: true
   tags: [docker, nfs]
 
-- name: "Afficher résultat mount NFS"
-  ansible.builtin.debug:
-    var: nfs_mount_result.stdout_lines
-  tags: [docker, nfs]
-
-- name: "Afficher résultat mount NFS"
+- name: "Afficher résultat montage NFS"
   ansible.builtin.debug:
     var: nfs_mount_result.stdout_lines
   tags: [docker, nfs]

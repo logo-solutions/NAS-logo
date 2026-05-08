@@ -13,7 +13,7 @@ hdd_mount_point: /Volumes/NAS-LOGO-DATA
 # NFS configuration — optimisation pour virtiofs + gros volumes (2026-05-08)
 use_nfs: true
 nfs_mount_path: /mnt/photos  # Montage NFS dans Colima
-nfs_server: host.lima.internal  # Colima → macOS (host.lima.internal)
+nfs_server: 192.168.5.2  # Gateway Colima → macOS (trouvée via: colima ssh "ip route show default")
 nfs_export: /Volumes/NAS-LOGO-DATA  # Export NFS sur macOS
 
 # Fallback SSD si HDD absente (2026-05-03)
