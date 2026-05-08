@@ -169,13 +169,12 @@
   changed_when: true
   tags: [docker, nfs]
 
-- name: "Monter NFS dans Colima VM"
+- name: "Monter NFS dans Colima VM (avec sudo NOPASSWD)"
   ansible.builtin.shell:
-    cmd: "/opt/homebrew/bin/colima ssh cat > /tmp/mount-nfs.sh << 'EOF'\n#!/bin/sh\nset -e\necho \"=== Montage NFS dans Colima ===\"\ncommand -v mount.nfs >/dev/null 2>&1 || (/usr/bin/sudo /usr/bin/apt-get update -qq && /usr/bin/sudo /usr/bin/apt-get install -y -qq nfs-common)\nmkdir -p /mnt/photos\n/usr/bin/sudo /usr/bin/umount /mnt/photos 2>/dev/null || true\necho \"Montage NFS depuis {{ nfs_server }}...\"\n/usr/bin/sudo /usr/bin/mount -t nfs -o soft,timeo=30 {{ nfs_server }}:/Volumes/NAS-LOGO-DATA /mnt/photos\necho \"✅ NFS monté:\"\nmount | grep /mnt/photos\ngrep -q \"/mnt/photos\" /etc/fstab || echo \"{{ nfs_server }}:/Volumes/NAS-LOGO-DATA /mnt/photos nfs soft,timeo=30,_netdev 0 0\" | /usr/bin/sudo /usr/bin/tee -a /etc/fstab >/dev/null\nEOF\nchmod +x /tmp/mount-nfs.sh\necho \"{{ ansible_become_password }}\" | /opt/homebrew/bin/colima ssh -s su -c 'sh /tmp/mount-nfs.sh'"
+    cmd: "/opt/homebrew/bin/colima ssh sh << 'EOF'\nset -e\necho '=== Configuration sudo NOPASSWD pour mount NFS ===' >/dev/stderr\necho 'logo ALL=(ALL) NOPASSWD: /usr/bin/mount, /usr/bin/umount, /usr/bin/apt-get, /usr/bin/tee' | sudo tee /etc/sudoers.d/colima-nfs >/dev/null\nsudo chmod 0440 /etc/sudoers.d/colima-nfs\necho '=== Montage NFS dans Colima ===' >/dev/stderr\ncommand -v mount.nfs >/dev/null 2>&1 || (sudo apt-get update -qq && sudo apt-get install -y -qq nfs-common) 2>/dev/null\nmkdir -p /mnt/photos\nsudo umount /mnt/photos 2>/dev/null || true\necho \"Montage NFS depuis {{ nfs_server }}...\" >/dev/stderr\nsudo mount -t nfs -o soft,timeo=30 {{ nfs_server }}:/Volumes/NAS-LOGO-DATA /mnt/photos\necho \"✅ NFS monté:\" >/dev/stderr\nmount | grep /mnt/photos\ngrep -q \"/mnt/photos\" /etc/fstab || echo \"{{ nfs_server }}:/Volumes/NAS-LOGO-DATA /mnt/photos nfs soft,timeo=30,_netdev 0 0\" | sudo tee -a /etc/fstab >/dev/null\necho \"✅ Done\" >/dev/stderr\nEOF"
   register: nfs_mount_result
   changed_when: nfs_mount_result.rc == 0
   delegate_to: localhost
-  no_log: true
   tags: [docker, nfs]
 
 - name: "Afficher résultat montage NFS"
