@@ -1,4 +1,5 @@
 # NAS-logo NFS exports — géré par Ansible
 # Exporte /Volumes/NAS-LOGO-DATA (HDD) pour montage NFS dans Colima
+# Syntaxe macOS: path -alldirs -mapall=uid:gid network/mask
 
-/Volumes/NAS-LOGO-DATA -mapall=501:20 localhost
+/Volumes/NAS-LOGO-DATA -alldirs -mapall=501:20 127.0.0.1/32
