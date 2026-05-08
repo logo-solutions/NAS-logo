@@ -195,26 +195,47 @@
     var: nfs_exports.stdout
   tags: [docker, nfs]
 
-- name: "Configurer NFS mount dans Colima VM (via colima ssh)"
-  ansible.builtin.shell:
-    cmd: |
-      colima ssh << 'EOF'
-      # Installer NFS client si absent
-      ! command -v mount.nfs &>/dev/null && sudo apt-get update && sudo apt-get install -y nfs-common
+- name: "Déployer script mount NFS dans Colima"
+  ansible.builtin.copy:
+    content: |
+      #!/bin/sh
+      set -e
+      echo "=== Setup NFS mount dans Colima ==="
 
-      # Créer répertoire de montage
+      # Installer NFS client
+      if ! command -v mount.nfs &>/dev/null; then
+        echo "Installing nfs-common..."
+        sudo apt-get update >/dev/null 2>&1
+        sudo apt-get install -y nfs-common >/dev/null 2>&1
+      fi
+
+      # Créer et monter NFS
+      echo "Creating /mnt/photos..."
       sudo mkdir -p /mnt/photos
 
-      # Monter NFS (host.lima.internal = macOS host)
+      echo "Mounting NFS..."
       sudo umount /mnt/photos 2>/dev/null || true
       sudo mount -t nfs -o vers=3,soft,timeo=10,retrans=3 host.lima.internal:/Volumes/NAS-LOGO-DATA /mnt/photos
 
-      # Vérifier le mount
-      mount | grep /mnt/photos && echo "✅ NFS mounted successfully"
+      # Vérifier
+      echo "✅ NFS mounted:"
+      mount | grep /mnt/photos
 
-      # Ajouter à fstab pour persistance
-      echo "host.lima.internal:/Volumes/NAS-LOGO-DATA /mnt/photos nfs vers=3,soft,timeo=10,retrans=3,_netdev 0 0" | \
-        sudo tee -a /etc/fstab > /dev/null
-      EOF
-  changed_when: true
+      # Ajouter à fstab
+      grep -q "/mnt/photos" /etc/fstab || echo "host.lima.internal:/Volumes/NAS-LOGO-DATA /mnt/photos nfs vers=3,soft,timeo=10,retrans=3,_netdev 0 0" | sudo tee -a /etc/fstab >/dev/null
+      echo "✅ Done"
+    dest: /tmp/nas-logo-mount-nfs.sh
+    mode: "0755"
+  tags: [docker, nfs]
+
+- name: "Exécuter mount NFS dans Colima VM"
+  ansible.builtin.command:
+    cmd: "colima ssh /tmp/nas-logo-mount-nfs.sh"
+  register: nfs_mount_result
+  changed_when: "nfs_mount_result.rc == 0"
+  tags: [docker, nfs]
+
+- name: "Afficher résultat mount NFS"
+  ansible.builtin.debug:
+    var: nfs_mount_result.stdout_lines
   tags: [docker, nfs]
