@@ -231,7 +231,7 @@
 
 - name: "Exécuter mount NFS dans Colima VM"
   ansible.builtin.command:
-    cmd: "colima ssh /tmp/nas-logo-mount-nfs.sh"
+    cmd: "/opt/homebrew/bin/colima ssh /tmp/nas-logo-mount-nfs.sh"
   register: nfs_mount_result
   changed_when: "nfs_mount_result.rc == 0"
   tags: [docker, nfs]
