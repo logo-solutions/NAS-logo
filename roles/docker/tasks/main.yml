@@ -216,14 +216,14 @@
 
       echo "Mounting NFS..."
       sudo umount /mnt/photos 2>/dev/null || true
-      sudo mount -t nfs -o vers=3,soft,timeo=10,retrans=3 host.lima.internal:/Volumes/NAS-LOGO-DATA /mnt/photos
+      sudo mount -t nfs -o soft,timeo=10,retrans=3 host.lima.internal:/Volumes/NAS-LOGO-DATA /mnt/photos
 
       # Vérifier
       echo "✅ NFS mounted:"
       mount | grep /mnt/photos
 
       # Ajouter à fstab
-      grep -q "/mnt/photos" /etc/fstab || echo "host.lima.internal:/Volumes/NAS-LOGO-DATA /mnt/photos nfs vers=3,soft,timeo=10,retrans=3,_netdev 0 0" | sudo tee -a /etc/fstab >/dev/null
+      grep -q "/mnt/photos" /etc/fstab || echo "host.lima.internal:/Volumes/NAS-LOGO-DATA /mnt/photos nfs soft,timeo=10,retrans=3,_netdev 0 0" | sudo tee -a /etc/fstab >/dev/null
       echo "✅ Done"
       EOF
   register: nfs_mount_result
