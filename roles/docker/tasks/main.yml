@@ -170,7 +170,7 @@
     cmd: |
       grep -v "NAS-LOGO" /etc/exports > /tmp/exports.tmp 2>/dev/null || true
       cat /etc/exports.nas-logo >> /tmp/exports.tmp
-      sudo mv /tmp/exports.tmp /etc/exports
+      mv /tmp/exports.tmp /etc/exports
   become: true
   changed_when: true
   tags: [docker, nfs]
@@ -178,8 +178,9 @@
 - name: "Activer et redémarrer NFS"
   ansible.builtin.shell:
     cmd: |
-      sudo nfsd enable
-      sudo nfsd restart
+      nfsd enable
+      nfsd restart
+  become: true
   changed_when: true
   tags: [docker, nfs]
 
