@@ -160,19 +160,10 @@
 - name: "Configurer NFS export sur macOS (/etc/exports)"
   ansible.builtin.template:
     src: exports.j2
-    dest: /etc/exports.nas-logo
+    dest: /etc/exports
     mode: "0644"
+    backup: true
   become: true
-  tags: [docker, nfs]
-
-- name: "Merger export NFS dans /etc/exports"
-  ansible.builtin.shell:
-    cmd: |
-      grep -v "NAS-LOGO" /etc/exports > /tmp/exports.tmp 2>/dev/null || true
-      cat /etc/exports.nas-logo >> /tmp/exports.tmp
-      mv /tmp/exports.tmp /etc/exports
-  become: true
-  changed_when: true
   tags: [docker, nfs]
 
 - name: "Activer et redémarrer NFS"
@@ -184,16 +175,17 @@
   changed_when: true
   tags: [docker, nfs]
 
-- name: "Vérifier NFS actif"
-  ansible.builtin.command:
-    cmd: "showmount -e localhost"
-  register: nfs_exports
+- name: "Vérifier NFS en cours d'exécution"
+  ansible.builtin.shell:
+    cmd: "ps aux | grep -E 'nfsd|nfs' | grep -v grep | wc -l"
+  register: nfs_process
   changed_when: false
+  delegate_to: localhost
   tags: [docker, nfs]
 
-- name: "Afficher exports NFS"
+- name: "Afficher statut NFS"
   ansible.builtin.debug:
-    var: nfs_exports.stdout
+    msg: "NFS daemon processes: {{ nfs_process.stdout }}"
   tags: [docker, nfs]
 
 - name: "Configurer NFS mount dans Colima VM"
