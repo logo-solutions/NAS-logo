@@ -62,7 +62,7 @@ $RCLONE sync "{{ ssd_mount_point }}" hetzner-crypt:current/ssd \
   --min-age 5m
 
 # 4. Sync HDD vers Hetzner chiffré (fichiers Immich, Paperless, documents)
-# Exclusions : thumbs, encoded-video (reconstruits sur SSD), fichiers système
+# Exclusions : thumbs, encoded-video (reconstruits sur SSD), sources brutes déjà importées, fichiers système
 echo "==> Sync HDD vers Hetzner..." | tee -a "$LOG_FILE" >&2
 $RCLONE sync "{{ hdd_nas_volume }}" hetzner-crypt:current/hdd \
   --backup-dir "hetzner-crypt:versions/$(date +%Y%m%d)/hdd" \
@@ -71,6 +71,10 @@ $RCLONE sync "{{ hdd_nas_volume }}" hetzner-crypt:current/hdd \
   --exclude "immich/backups/**" \
   --exclude "paperless/db/**" \
   --exclude "paperless/redis/**" \
+  --exclude "_done/**" \
+  --exclude "AFAIRE+tard/**" \
+  --exclude "MAIL/**" \
+  --exclude "files/**" \
   --exclude ".DS_Store" \
   --exclude "*.DS_Store" \
   --log-level INFO \
