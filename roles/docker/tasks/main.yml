@@ -149,33 +149,9 @@
   changed_when: false
   tags: [docker]
 
-- name: "Configurer NFS export sur macOS (/etc/exports)"
-  ansible.builtin.template:
-    src: exports.j2
-    dest: /etc/exports
-    mode: "0644"
-    backup: true
-  become: true
-  register: nfs_exports_config
-  tags: [docker, nfs]
-
-- name: "Activer et redémarrer NFS"
-  ansible.builtin.shell:
-    cmd: |
-      nfsd enable
-      nfsd restart
-  become: true
-  when: nfs_exports_config.changed
-  changed_when: true
-  tags: [docker, nfs]
-
-- name: "Monter NFS dans Colima VM (avec sudo NOPASSWD)"
-  ansible.builtin.shell:
-    cmd: "/opt/homebrew/bin/colima ssh sh << 'EOF'\nset -e\necho '=== Configuration sudo NOPASSWD pour mount NFS ===' >/dev/stderr\necho 'logo ALL=(ALL) NOPASSWD: /usr/bin/mount, /usr/bin/umount, /usr/bin/apt-get, /usr/bin/tee' | sudo tee /etc/sudoers.d/colima-nfs >/dev/null\nsudo chmod 0440 /etc/sudoers.d/colima-nfs\necho '=== Montage NFS dans Colima ===' >/dev/stderr\ncommand -v mount.nfs >/dev/null 2>&1 || (sudo apt-get update -qq && sudo apt-get install -y -qq nfs-common) 2>/dev/null\nmkdir -p /mnt/photos\nsudo umount /mnt/photos 2>/dev/null || true\necho \"Montage NFS depuis {{ nfs_server }}...\" >/dev/stderr\nsudo mount -t nfs -o soft,timeo=30 {{ nfs_server }}:/Volumes/NAS-LOGO-DATA /mnt/photos\necho \"✅ NFS monté:\" >/dev/stderr\nmount | grep /mnt/photos\ngrep -q \"/mnt/photos\" /etc/fstab || echo \"{{ nfs_server }}:/Volumes/NAS-LOGO-DATA /mnt/photos nfs soft,timeo=30,_netdev 0 0\" | sudo tee -a /etc/fstab >/dev/null\necho \"✅ Done\" >/dev/stderr\nEOF"
-  register: nfs_mount_result
-  changed_when: nfs_mount_result.rc == 0
-  delegate_to: localhost
-  tags: [docker, nfs]
+# NFS disabled (2026-05-08): macOS Sequoia sandbox blocks nfsd access to /Volumes
+# Using VirtioFS directly instead — HDD accessible as /Volumes/NAS-LOGO-DATA in Colima VM
+# Immich/Paperless access via {{ hdd_nas_volume }} variable
 
 - name: "Afficher résultat montage NFS"
   ansible.builtin.debug:

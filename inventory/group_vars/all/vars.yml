@@ -10,15 +10,10 @@ ssd_mount_point: /Volumes/logousb/SSD/NAS-LOGO-VOLUME
 # NOTE: Actuellement tout est sur SSD. hdd_mount_point ne sera montée que si un disque externe est branché
 hdd_mount_point: /Volumes/NAS-LOGO-DATA
 
-# NFS configuration — optimisation pour virtiofs + gros volumes (2026-05-08)
-use_nfs: true
-nfs_mount_path: /mnt/photos  # Montage NFS dans Colima
-nfs_server: 192.168.5.2  # Gateway Colima → macOS (trouvée via: colima ssh "ip route show default")
-nfs_export: /Volumes/NAS-LOGO-DATA  # Export NFS sur macOS
-
-# Fallback SSD si HDD absente (2026-05-03)
-# Si NFS activé: use nfs_mount_path, sinon use hdd_mount_point
-hdd_nas_volume: "{{ nfs_mount_path if use_nfs else hdd_mount_point }}"
+# VirtioFS — HDD monté directement dans la VM Colima (2026-05-08)
+# Sandbox macOS bloque NFS/SMB/SSHFS daemons → usage direct virtiofs
+# Le chemin /Volumes/NAS-LOGO-DATA est accessible dans la VM via virtiofs
+hdd_nas_volume: "{{ hdd_mount_point }}"  # /Volumes/NAS-LOGO-DATA in Colima
 
 # Immich — instance loic-perso
 # SOURCE: immich/upload → CIBLE: personnes/loic-perso/immich/upload (structure standard Immich)
@@ -62,9 +57,9 @@ tailscale_tags: "tag:nas"
 # Immich
 immich_api_key: "{{ vault_immich_api_key }}"
 
-# Paperless-ngx
+# Paperless-ngx (sur SSD pour éviter restrictions sandbox macOS en SSH)
 paperless_port: 8010
-paperless_data_dir: "{{ hdd_nas_volume }}/paperless"
+paperless_data_dir: "{{ ssd_mount_point }}/paperless"
 paperless_db_name: paperless
 paperless_db_user: paperless
 paperless_db_password: "{{ vault_paperless_db_password }}"
