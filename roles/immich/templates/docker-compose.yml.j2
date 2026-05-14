@@ -22,7 +22,7 @@ services:
       - database
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://127.0.0.1:{{ immich_port }}/api/server/ping"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:{{ immich_port }}/api/server/ping"]
       interval: 30s
       timeout: 10s
       retries: 5

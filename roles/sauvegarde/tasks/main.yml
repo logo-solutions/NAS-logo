@@ -56,6 +56,20 @@
     mode: "0755"
   tags: [sauvegarde, restore]
 
+- name: "Déployer le script de dump Immich BD"
+  ansible.builtin.template:
+    src: dump-immich-db.sh.j2
+    dest: "{{ backup_scripts_dir }}/nas-logo-dump-immich-db.sh"
+    mode: "0755"
+  tags: [sauvegarde, immich]
+
+- name: "Déployer le script de backup env + conf"
+  ansible.builtin.template:
+    src: backup-configs.sh.j2
+    dest: "{{ backup_scripts_dir }}/nas-logo-backup-configs.sh"
+    mode: "0755"
+  tags: [sauvegarde, configs]
+
 - name: "Créer symlinks dans /usr/local/bin"
   ansible.builtin.file:
     src: "{{ backup_scripts_dir }}/{{ item }}"
@@ -65,8 +79,10 @@
   become: true
   loop:
     - nas-logo-dump-db.sh
+    - nas-logo-dump-immich-db.sh
     - nas-logo-backup.sh
     - nas-logo-backup-cible.sh
+    - nas-logo-backup-configs.sh
     - nas-logo-restore-test.sh
     - nas-logo-restore.sh
   tags: [sauvegarde]
