@@ -20,8 +20,9 @@ install: ## Étape 3 : Installation complète
 health: ## Vérification de l'état du système
 	ansible-playbook -i $(INVENTORY) healthcheck.yml $(VAULT_ARGS)
 
-backup: ## Sauvegarde manuelle immédiate
-	ssh logo@100.113.214.55 "/usr/local/bin/nas-logo-backup.sh"
+backup: ## Sauvegarde manuelle complète (NAS rclone + Immich BD/config/Hetzner)
+	bash /usr/local/bin/nas-logo-backup.sh
+	bash bin/immich-backup.sh
 
 restore-list: ## Lister les versions de sauvegarde disponibles
 	ssh logo@100.113.214.55 "/usr/local/bin/nas-logo-restore.sh --list"
