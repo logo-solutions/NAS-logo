@@ -21,7 +21,7 @@ health: ## Vérification de l'état du système
 	ansible-playbook -i $(INVENTORY) healthcheck.yml $(VAULT_ARGS)
 
 backup: ## Sauvegarde manuelle complète (NAS rclone + Immich BD/config/Hetzner)
-	bash /usr/local/bin/nas-logo-backup.sh
+	-bash /usr/local/bin/nas-logo-backup.sh
 	bash bin/immich-backup.sh
 
 restore-list: ## Lister les versions de sauvegarde disponibles
