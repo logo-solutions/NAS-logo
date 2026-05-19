@@ -30,39 +30,49 @@ check_dump() {
 }
 
 # ── Immich ──────────────────────────────────────────────────────────────────
-IMMICH_DUMP="$BACKUP_DIR/immich-db-$(date +%Y%m%d-%H%M%S).sql.gz"
-echo "==> Dump PostgreSQL Immich..." | tee -a "$LOG_FILE" >&2
-/opt/homebrew/bin/docker exec immich_postgres pg_dumpall \
-  --clean \
-  --if-exists \
-  --username=immich \
-  | gzip > "$IMMICH_DUMP"
-check_dump "$IMMICH_DUMP" "Immich"
+if /opt/homebrew/bin/docker ps --filter "name=immich_postgres" --format "{{.ID}}" | grep -q .; then
+  IMMICH_DUMP="$BACKUP_DIR/immich-db-$(date +%Y%m%d-%H%M%S).sql.gz"
+  echo "==> Dump PostgreSQL Immich..." | tee -a "$LOG_FILE" >&2
+  /opt/homebrew/bin/docker exec immich_postgres pg_dumpall \
+    --clean \
+    --if-exists \
+    --username=immich \
+    | gzip > "$IMMICH_DUMP"
+  check_dump "$IMMICH_DUMP" "Immich"
+else
+  echo "==> WARN: conteneur immich_postgres n'existe pas — dump ignoré" | tee -a "$LOG_FILE" >&2
+fi
 
 # ── Paperless ────────────────────────────────────────────────────────────────
-PAPERLESS_DUMP="$BACKUP_DIR/paperless-db-$(date +%Y%m%d-%H%M%S).sql.gz"
-echo "==> Dump PostgreSQL Paperless..." | tee -a "$LOG_FILE" >&2
-/opt/homebrew/bin/docker exec paperless_db pg_dump \
-  --clean \
-  --if-exists \
-  --username=paperless \
-  paperless \
-  | gzip > "$PAPERLESS_DUMP"
-check_dump "$PAPERLESS_DUMP" "Paperless"
+if /opt/homebrew/bin/docker ps --filter "name=paperless_db" --format "{{.ID}}" | grep -q .; then
+  PAPERLESS_DUMP="$BACKUP_DIR/paperless-db-$(date +%Y%m%d-%H%M%S).sql.gz"
+  echo "==> Dump PostgreSQL Paperless..." | tee -a "$LOG_FILE" >&2
+  /opt/homebrew/bin/docker exec paperless_db pg_dump \
+    --clean \
+    --if-exists \
+    --username=paperless \
+    paperless \
+    | gzip > "$PAPERLESS_DUMP"
+  check_dump "$PAPERLESS_DUMP" "Paperless"
+else
+  echo "==> WARN: conteneur paperless_db n'existe pas — dump ignoré" | tee -a "$LOG_FILE" >&2
+fi
 
 # ── n8n ──────────────────────────────────────────────────────────────────────
-N8N_DUMP="$BACKUP_DIR/n8n-db-$(date +%Y%m%d-%H%M%S).sql.gz"
-echo "==> Dump PostgreSQL n8n..." | tee -a "$LOG_FILE" >&2
-/opt/homebrew/bin/docker exec n8n_db pg_dump \
-  --clean \
-  --if-exists \
-  --username=n8n \
-  n8n \
-  | gzip > "$N8N_DUMP"
-check_dump "$N8N_DUMP" "n8n"
+if /opt/homebrew/bin/docker ps --filter "name=n8n_db" --format "{{.ID}}" | grep -q .; then
+  N8N_DUMP="$BACKUP_DIR/n8n-db-$(date +%Y%m%d-%H%M%S).sql.gz"
+  echo "==> Dump PostgreSQL n8n..." | tee -a "$LOG_FILE" >&2
+  /opt/homebrew/bin/docker exec n8n_db pg_dump \
+    --clean \
+    --if-exists \
+    --username=n8n \
+    n8n \
+    | gzip > "$N8N_DUMP"
+  check_dump "$N8N_DUMP" "n8n"
+else
+  echo "==> WARN: conteneur n8n_db n'existe pas — dump ignoré" | tee -a "$LOG_FILE" >&2
+fi
 
 # ── Nettoyage local (7 jours) ────────────────────────────
-find "$BACKUP_DIR" -name "immich-db-*.sql.gz" -mtime +7 -delete
-find "$BACKUP_DIR" -name "paperless-db-*.sql.gz" -mtime +7 -delete
-find "$BACKUP_DIR" -name "n8n-db-*.sql.gz" -mtime +7 -delete
+find "$BACKUP_DIR" -name "*-db-*.sql.gz" -mtime +7 -delete 2>/dev/null || true
 echo "==> Nettoyage dumps locaux > 7j terminé" | tee -a "$LOG_FILE" >&2
