@@ -1,0 +1,8 @@
+---
+- name: Verify Immich deployment
+  hosts: localhost
+  gather_facts: true
+  tasks:
+    - name: Run pytest BDD tests
+      command: pytest roles/immich/tests -v --tb=short
+      changed_when: false

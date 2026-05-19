@@ -3,7 +3,7 @@ VAULT_PASS_FILE := $(HOME)/.nas-logo-vault-pass
 BECOME_PASS_FILE := $(HOME)/.nas-logo-become-pass
 VAULT_ARGS := --vault-password-file $(VAULT_PASS_FILE) --become-password-file $(BECOME_PASS_FILE)
 
-.PHONY: bootstrap preflight dryrun install health backup lint claude tailscale-test scan-disks resilience
+.PHONY: bootstrap preflight dryrun install health backup lint claude tailscale-test scan-disks resilience scan import
 
 bootstrap: ## Étape 1 : Homebrew + Ansible + dépendances système
 	bash bootstrap.sh
@@ -61,6 +61,14 @@ maintenance-on: ## Suspendre les sauvegardes (mode maintenance)
 maintenance-off: ## Reprendre les sauvegardes
 	ansible -i $(INVENTORY) macmini -m ansible.builtin.file -a "path=/tmp/nas-logo-maintenance state=absent" $(VAULT_ARGS)
 	@echo "Mode maintenance OFF — sauvegardes reprises"
+
+scan: ## Analyser une source — SHA-1 dedup preview sans import (SOURCE=/path/to/source)
+	@[ -n "$(SOURCE)" ] || (echo "Usage: make scan SOURCE=/path/to/source"; exit 1)
+	bash bin/immich-import.sh "$(SOURCE)" --scan-only
+
+import: ## Importer une source (SOURCE=/path [GOOGLE=1] [NO_HETZNER=1])
+	@[ -n "$(SOURCE)" ] || (echo "Usage: make import SOURCE=/path/to/source [GOOGLE=1] [NO_HETZNER=1]"; exit 1)
+	bash bin/immich-import.sh "$(SOURCE)" $(if $(GOOGLE),--google) $(if $(NO_HETZNER),--no-hetzner)
 
 help: ## Afficher cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \

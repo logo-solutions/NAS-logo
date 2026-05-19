@@ -50,6 +50,40 @@
   when: tailscale_final.stdout | length > 0
   tags: [securite, tailscale]
 
+- name: "Déployer le script de démarrage Tailscale"
+  ansible.builtin.template:
+    src: tailscale-start.sh.j2
+    dest: /usr/local/bin/nas-logo-tailscale-start.sh
+    mode: "0755"
+  become: true
+  tags: [securite, tailscale]
+
+- name: "Déployer le LaunchAgent Tailscale"
+  ansible.builtin.template:
+    src: com.nas-logo.tailscale.plist.j2
+    dest: "/Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.tailscale.plist"
+    mode: "0644"
+  register: tailscale_plist
+  tags: [securite, tailscale]
+
+- name: "Charger (ou recharger) le LaunchAgent Tailscale"
+  ansible.builtin.command:
+    cmd: "launchctl bootout gui/{{ ansible_user_uid }} /Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.tailscale.plist"
+  failed_when: false
+  changed_when: false
+  when: tailscale_plist.changed
+  tags: [securite, tailscale]
+
+- name: "Activer le LaunchAgent Tailscale"
+  ansible.builtin.command:
+    cmd: "launchctl bootstrap gui/{{ ansible_user_uid }} /Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.tailscale.plist"
+  register: launchctl_bootstrap
+  failed_when:
+    - launchctl_bootstrap.rc != 0
+    - '"service already loaded" not in launchctl_bootstrap.stderr'
+  changed_when: launchctl_bootstrap.rc == 0
+  tags: [securite, tailscale]
+
 - name: "Déployer la config SSH (Tailscale uniquement)"
   ansible.builtin.template:
     src: nas-logo-ssh.conf.j2

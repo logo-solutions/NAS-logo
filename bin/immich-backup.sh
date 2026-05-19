@@ -41,18 +41,23 @@ log "3/5 — Sauvegarde colima.yaml..."
 cp "$COLIMA_CONFIG" "$JOURNAUX/colima-config-${TS}.yaml"
 ok "colima.yaml sauvegardé"
 
-# Étape 4 — Vérification Hetzner
-log "4/5 — Vérification connexion Hetzner (${HETZNER_HOST}:${HETZNER_PORT})..."
-if ! nc -zw5 "$HETZNER_HOST" "$HETZNER_PORT" 2>/dev/null; then
-  fail "Hetzner injoignable (${HETZNER_HOST}:${HETZNER_PORT})"
-  HETZNER_STATUS="KO"
+# Étape 4 & 5 — Hetzner (skip si --no-hetzner)
+if [ "${NO_HETZNER:-}" = "1" ]; then
+  HETZNER_STATUS="SKIPPED"
+  log "4/5 — Hetzner SKIPPED (--no-hetzner)"
 else
-  ok "Connexion Hetzner OK"
+  log "4/5 — Vérification connexion Hetzner (${HETZNER_HOST}:${HETZNER_PORT})..."
+  if ! nc -zw5 "$HETZNER_HOST" "$HETZNER_PORT" 2>/dev/null; then
+    fail "Hetzner injoignable (${HETZNER_HOST}:${HETZNER_PORT})"
+    HETZNER_STATUS="KO"
+  else
+    ok "Connexion Hetzner OK"
 
-  # Étape 5 — Push dump vers Hetzner
-  log "5/5 — Envoi BD vers Hetzner..."
-  rclone copy "$DUMP" hetzner-crypt:backups-db/
-  ok "BD copiée sur Hetzner"
+    # Étape 5 — Push dump vers Hetzner
+    log "5/5 — Envoi BD vers Hetzner..."
+    rclone copy "$DUMP" hetzner-crypt:backups-db/
+    ok "BD copiée sur Hetzner"
+  fi
 fi
 
 # Résumé final

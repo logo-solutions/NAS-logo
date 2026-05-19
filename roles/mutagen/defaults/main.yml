@@ -1,0 +1,26 @@
+---
+# roles/mutagen — Valeurs par défaut
+
+# Chemin Mutagen binary
+mutagen_bin: /opt/homebrew/bin/mutagen
+
+# Nom de la session Mutagen
+mutagen_session_name: nas-photos
+
+# Répertoires à ignorer lors de la synchronisation
+mutagen_ignore_patterns:
+  - ".DS_Store"
+  - ".git"
+  - ".gitignore"
+  - "node_modules"
+  - "__pycache__"
+  - "*.tmp"
+  - "*.log"
+  - ".venv"
+  - ".env.local"
+
+# Chemin de montage dans Colima (utilisé par Docker)
+mutagen_mount_path: "/mnt/photos"
+
+# Mode de sync (two-way-resolved = résout les conflits automatiquement)
+mutagen_sync_mode: two-way-resolved

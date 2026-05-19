@@ -1,0 +1,35 @@
+#!/bin/bash
+# Dump de la BD Immich (postgres dans container Docker)
+# Utilisation: nas-logo-dump-immich-db.sh
+
+set -euo pipefail
+
+LOG_FILE="{{ backup_log_dir }}/immich-db-dump.log"
+BACKUP_DIR="{{ backup_dir }}"
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+DUMP_FILE="$BACKUP_DIR/immich-db-$TIMESTAMP.sql.gz"
+
+{
+  echo "[$(date)] Dump Immich BD..."
+
+  # Dump via docker exec
+  if ! docker exec immich_postgres pg_dumpall --clean --if-exists -U immich 2>/dev/null | gzip > "$DUMP_FILE"; then
+    echo "[$(date)] ❌ Dump failed"
+    exit 1
+  fi
+
+  # Vérifier intégrité
+  if ! gzip -t "$DUMP_FILE" 2>/dev/null; then
+    echo "[$(date)] ❌ Dump corrompu"
+    rm -f "$DUMP_FILE"
+    exit 1
+  fi
+
+  size=$(du -h "$DUMP_FILE" | cut -f1)
+  echo "[$(date)] ✓ Dump OK: $size"
+
+  # Nettoyer les vieux dumps (garder les 7 derniers)
+  ls -t "$BACKUP_DIR"/immich-db-*.sql.gz 2>/dev/null | tail -n +8 | xargs -r rm -f
+  echo "[$(date)] ✓ Nettoyage done"
+
+} | tee -a "$LOG_FILE"

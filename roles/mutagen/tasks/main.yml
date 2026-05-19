@@ -1,0 +1,99 @@
+---
+# roles/mutagen — File sync macOS ↔ Colima VM via Mutagen
+
+- name: "Ajouter Homebrew tap mutagen-io"
+  community.general.homebrew_tap:
+    name: mutagen-io/mutagen
+    state: present
+  tags: [mutagen]
+
+- name: "Installer Mutagen via Homebrew"
+  community.general.homebrew:
+    name: mutagen-io/mutagen/mutagen
+    state: present
+  tags: [mutagen]
+
+- name: "Vérifier Mutagen installation"
+  ansible.builtin.command:
+    cmd: "{{ mutagen_bin }} version"
+  register: mutagen_version
+  changed_when: false
+  tags: [mutagen]
+
+- name: "Afficher version Mutagen"
+  ansible.builtin.debug:
+    var: mutagen_version.stdout
+  tags: [mutagen]
+
+- name: "Arrêter les sessions Mutagen existantes"
+  ansible.builtin.command:
+    cmd: "{{ mutagen_bin }} sync terminate --all"
+  failed_when: false
+  changed_when: false
+  tags: [mutagen]
+
+- name: "Créer session Mutagen : NAS photos"
+  ansible.builtin.command:
+    cmd: "{{ mutagen_bin }} sync create --name {{ mutagen_session_name }} --mode two-way-resolved --ignore-vcs {{ nfs_export }} docker://colima/{{ mutagen_session_name }}"
+  register: mutagen_create
+  changed_when: mutagen_create.rc == 0
+  tags: [mutagen]
+
+- name: "Lister les sessions Mutagen"
+  ansible.builtin.command:
+    cmd: "{{ mutagen_bin }} sync list"
+  register: mutagen_list
+  changed_when: false
+  tags: [mutagen]
+
+- name: "Afficher sessions Mutagen"
+  ansible.builtin.debug:
+    var: mutagen_list.stdout_lines
+  tags: [mutagen]
+
+- name: "Attendre synchronisation Mutagen (10s)"
+  ansible.builtin.pause:
+    seconds: 10
+  tags: [mutagen]
+
+- name: "Vérifier état de la session Mutagen"
+  ansible.builtin.command:
+    cmd: "{{ mutagen_bin }} sync monitor {{ mutagen_session_name }}"
+  environment:
+    MUTAGEN_RUN_IN_BACKGROUND: "true"
+  register: mutagen_status
+  changed_when: false
+  failed_when: false
+  tags: [mutagen]
+
+- name: "Afficher status Mutagen"
+  ansible.builtin.debug:
+    var: mutagen_status.stdout_lines
+  tags: [mutagen]
+
+- name: "Créer script LaunchAgent pour Mutagen (persistance)"
+  ansible.builtin.template:
+    src: com.nas-logo.mutagen.plist.j2
+    dest: "/Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.mutagen.plist"
+    mode: "0644"
+  register: mutagen_plist
+  tags: [mutagen]
+
+- name: "Charger LaunchAgent Mutagen"
+  ansible.builtin.shell:
+    cmd: |
+      launchctl bootout gui/{{ ansible_user_uid }} /Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.mutagen.plist 2>/dev/null || true
+      launchctl bootstrap gui/{{ ansible_user_uid }} /Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.mutagen.plist
+  changed_when: true
+  when: mutagen_plist.changed
+  tags: [mutagen]
+
+- name: "Mettre à jour vars pour utiliser Mutagen"
+  ansible.builtin.set_fact:
+    hdd_nas_volume: "{{ mutagen_mount_path }}"
+  tags: [mutagen]
+
+- name: "Afficher chemin de montage Mutagen"
+  ansible.builtin.debug:
+    msg: "Immich/Paperless utiliseront : {{ hdd_nas_volume }}"
+  tags: [mutagen]

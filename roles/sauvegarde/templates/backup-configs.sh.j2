@@ -1,0 +1,56 @@
+#!/bin/bash
+# Backup des configs et env vars critiques
+# Utilisation: nas-logo-backup-configs.sh
+
+set -euo pipefail
+
+LOG_FILE="{{ backup_log_dir }}/configs-backup.log"
+BACKUP_DIR="{{ backup_dir }}"
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+BACKUP_TAR="$BACKUP_DIR/nas-logo-configs-$TIMESTAMP.tar.gz"
+TEMP_DIR="/tmp/nas-logo-configs-$$"
+
+mkdir -p "$TEMP_DIR"
+trap "rm -rf $TEMP_DIR" EXIT
+
+{
+  echo "[$(date)] Backup configs et env vars..."
+
+  # 1. Colima config
+  echo "[$(date)] Colima config..."
+  mkdir -p "$TEMP_DIR/colima"
+  cp ~/.colima/default/colima.yaml "$TEMP_DIR/colima/" 2>/dev/null || true
+
+  # 2. Immich docker-compose
+  echo "[$(date)] Immich docker-compose..."
+  mkdir -p "$TEMP_DIR/immich"
+  docker inspect immich_postgres | jq '.[] | {Env}' > "$TEMP_DIR/immich/postgres-env.json" 2>/dev/null || true
+  docker inspect immich_server | jq '.[] | {Env}' > "$TEMP_DIR/immich/server-env.json" 2>/dev/null || true
+
+  # 3. Paperless env
+  echo "[$(date)] Paperless env..."
+  mkdir -p "$TEMP_DIR/paperless"
+  docker inspect paperless | jq '.[] | {Env}' > "$TEMP_DIR/paperless/env.json" 2>/dev/null || true
+
+  # 4. N8n env
+  echo "[$(date)] N8n env..."
+  mkdir -p "$TEMP_DIR/n8n"
+  docker inspect n8n | jq '.[] | {Env}' > "$TEMP_DIR/n8n/env.json" 2>/dev/null || true
+
+  # 5. ansible inventory (variables)
+  echo "[$(date)] Ansible inventory..."
+  mkdir -p "$TEMP_DIR/ansible"
+  cp {{ playbook_dir }}/inventory/group_vars/all/vars.yml "$TEMP_DIR/ansible/" 2>/dev/null || true
+
+  # Créer l'archive
+  echo "[$(date)] Création archive..."
+  tar -czf "$BACKUP_TAR" -C "$TEMP_DIR" . 2>/dev/null
+
+  size=$(du -h "$BACKUP_TAR" | cut -f1)
+  echo "[$(date)] ✓ Backup OK: $size"
+
+  # Nettoyer les vieux backups (garder les 7 derniers)
+  ls -t "$BACKUP_DIR"/nas-logo-configs-*.tar.gz 2>/dev/null | tail -n +8 | xargs -r rm -f
+  echo "[$(date)] ✓ Nettoyage done"
+
+} | tee -a "$LOG_FILE"

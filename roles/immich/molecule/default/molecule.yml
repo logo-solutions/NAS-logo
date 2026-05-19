@@ -1,0 +1,22 @@
+---
+dependency:
+  name: galaxy
+
+driver:
+  name: none
+
+provisioner:
+  name: ansible
+  playbooks:
+    converge: converge.yml
+    verify: verify.yml
+  inventory:
+    hosts:
+      localhost:
+        ansible_connection: local
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
+verifier:
+  name: pytest
+  options:
+    verbose: true

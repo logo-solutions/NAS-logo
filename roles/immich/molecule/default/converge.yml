@@ -1,0 +1,39 @@
+---
+- name: Apply Immich role
+  hosts: localhost
+  gather_facts: true
+  vars:
+    # Minimal vars for testing — override from inventory if needed
+    ssd_mount_point: /Volumes/NAS-LOGO-SSD
+    hdd_mount_point: /Volumes/NAS-LOGO-DATA
+    hdd_nas_volume: /Volumes/NAS-LOGO-DATA/NAS-LOGO-VOLUME
+    immich_data_dir: "{{ hdd_nas_volume }}/personnes/loic-perso/immich"
+    immich_users:
+      - login: loic-perso
+        email: loic@logo-solutions.fr
+        name: Loïc Personnel
+      - login: loic-immo
+        email: loic@logo-solutions.fr
+        name: Loïc Immobilier
+      - login: loic-pro
+        email: loic@logo-solutions.fr
+        name: Loïc Professionnel
+      - login: alban
+        email: alban@family.fr
+        name: Alban
+      - login: ilan
+        email: ilan@family.fr
+        name: Ilan
+      - login: mahaut
+        email: mahaut@family.fr
+        name: Mahaut
+      - login: alice-perso
+        email: alice@family.fr
+        name: Alice Personnel
+      - login: alice-prof
+        email: alice@family.fr
+        name: Alice Professionnel
+    immich_db_password: "test-immich-db-pass"
+    immich_ml_cache: "{{ hdd_nas_volume }}/immich-ml-cache"
+  roles:
+    - immich

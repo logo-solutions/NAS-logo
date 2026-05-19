@@ -46,11 +46,29 @@ if [ "$FREE_GB" -lt 5 ]; then
 fi
 echo "==> Espace OK : ${FREE_GB}Go libres" | tee -a "$LOG_FILE" >&2
 
+# Déterminer le tier de sauvegarde (daily, weekly, ou monthly) selon le calendrier
+TODAY=$(date +%Y%m%d)
+DOW=$(date +%u)       # 1=lundi … 7=dimanche
+DOM=$(date +%d)       # 01-31
+
+if [ "$DOM" = "01" ]; then
+  BACKUP_TIER="monthly"
+  BACKUP_KEY=$(date +%Y%m)   # ex: 202605
+elif [ "$DOW" = "7" ]; then
+  BACKUP_TIER="weekly"
+  BACKUP_KEY="$TODAY"
+else
+  BACKUP_TIER="daily"
+  BACKUP_KEY="$TODAY"
+fi
+
+echo "==> Tier sauvegarde : $BACKUP_TIER/$BACKUP_KEY" | tee -a "$LOG_FILE" >&2
+
 # 3. Sync SSD vers Hetzner chiffré (DB, backups, index, services)
 # Exclusions : thumbs, encoded-video (reconstruits), meilisearch, monitoring (rebuilt)
 echo "==> Sync SSD vers Hetzner..." | tee -a "$LOG_FILE" >&2
 $RCLONE sync "{{ ssd_mount_point }}" hetzner-crypt:current/ssd \
-  --backup-dir "hetzner-crypt:versions/$(date +%Y%m%d)/ssd" \
+  --backup-dir "hetzner-crypt:${BACKUP_TIER}/${BACKUP_KEY}/ssd" \
   --exclude "immich/thumbs/**" \
   --exclude "immich/encoded-video/**" \
   --exclude "meilisearch/**" \
@@ -65,7 +83,7 @@ $RCLONE sync "{{ ssd_mount_point }}" hetzner-crypt:current/ssd \
 # Exclusions : thumbs, encoded-video (reconstruits sur SSD), sources brutes déjà importées, fichiers système
 echo "==> Sync HDD vers Hetzner..." | tee -a "$LOG_FILE" >&2
 $RCLONE sync "{{ hdd_nas_volume }}" hetzner-crypt:current/hdd \
-  --backup-dir "hetzner-crypt:versions/$(date +%Y%m%d)/hdd" \
+  --backup-dir "hetzner-crypt:${BACKUP_TIER}/${BACKUP_KEY}/hdd" \
   --exclude "immich/thumbs/**" \
   --exclude "immich/encoded-video/**" \
   --exclude "immich/backups/**" \
@@ -81,17 +99,62 @@ $RCLONE sync "{{ hdd_nas_volume }}" hetzner-crypt:current/hdd \
   --log-file "$LOG_FILE" \
   --min-age 5m
 
-# 5. Rétention : purger les anciennes versions (garder min N versions)
-echo "==> Application de la rétention (min {{ backup_daily_keep }} versions)..." | tee -a "$LOG_FILE" >&2
-for bucket in ssd hdd; do
-  echo "==> Purge versions $bucket > {{ backup_daily_keep }} jours..." | tee -a "$LOG_FILE" >&2
-  $RCLONE lsd hetzner-crypt:versions 2>/dev/null | awk '{print $NF}' | sort -r | \
-    tail -n +$(( {{ backup_daily_keep }} + 1 )) | while read dir; do
-      if $RCLONE lsd "hetzner-crypt:versions/$dir/$bucket" 2>/dev/null | grep -q .; then
-        echo "==> Purge version : $dir/$bucket" | tee -a "$LOG_FILE" >&2
-        $RCLONE purge "hetzner-crypt:versions/$dir/$bucket" --log-file "$LOG_FILE" || true
-      fi
-    done
+# 4b. Copie locale miroir → MacOS-vide/sauvegardeNAS (sans chiffrement, sans rotation)
+LOCAL_BACKUP="{{ local_backup_dir }}"
+if [ -d "$(dirname "$LOCAL_BACKUP")" ] && mount | grep -q "MacOS-vide"; then
+  echo "==> Copie locale SSD → $LOCAL_BACKUP/current/ssd..." | tee -a "$LOG_FILE" >&2
+  $RCLONE sync "{{ ssd_mount_point }}" "$LOCAL_BACKUP/current/ssd" \
+    --exclude "immich/thumbs/**" \
+    --exclude "immich/encoded-video/**" \
+    --exclude "meilisearch/**" \
+    --exclude "monitoring/**" \
+    --exclude ".DS_Store" \
+    --exclude "*.DS_Store" \
+    --log-level INFO \
+    --log-file "$LOG_FILE" \
+    --min-age 5m
+
+  echo "==> Copie locale HDD → $LOCAL_BACKUP/current/hdd..." | tee -a "$LOG_FILE" >&2
+  $RCLONE sync "{{ hdd_nas_volume }}" "$LOCAL_BACKUP/current/hdd" \
+    --exclude "immich/thumbs/**" \
+    --exclude "immich/encoded-video/**" \
+    --exclude "immich/backups/**" \
+    --exclude "paperless/db/**" \
+    --exclude "paperless/redis/**" \
+    --exclude "_done/**" \
+    --exclude "AFAIRE+tard/**" \
+    --exclude "MAIL/**" \
+    --exclude "files/**" \
+    --exclude ".DS_Store" \
+    --exclude "*.DS_Store" \
+    --log-level INFO \
+    --log-file "$LOG_FILE" \
+    --min-age 5m
+else
+  echo "==> WARN: MacOS-vide non monté — copie locale ignorée" | tee -a "$LOG_FILE" >&2
+fi
+
+# 5. Rétention : purger les anciennes versions par tier (daily, weekly, monthly)
+echo "==> Application de la rétention (daily: {{ backup_daily_keep }}, weekly: {{ backup_weekly_keep }}, monthly: {{ backup_monthly_keep }})..." | tee -a "$LOG_FILE" >&2
+
+for TIER in daily weekly monthly; do
+  case "$TIER" in
+    daily)   KEEP={{ backup_daily_keep }} ;;
+    weekly)  KEEP={{ backup_weekly_keep }} ;;
+    monthly) KEEP={{ backup_monthly_keep }} ;;
+  esac
+
+  echo "==> Purge versions $TIER (garder $KEEP)..." | tee -a "$LOG_FILE" >&2
+  VERSIONS=$($RCLONE lsf "hetzner-crypt:${TIER}/" --dirs-only 2>/dev/null | sort -r)
+  COUNT=0
+
+  for V in $VERSIONS; do
+    COUNT=$((COUNT+1))
+    if [ $COUNT -gt $KEEP ]; then
+      echo "==> Purge ${TIER}/$V" | tee -a "$LOG_FILE" >&2
+      $RCLONE purge "hetzner-crypt:${TIER}/${V%/}" --log-file "$LOG_FILE" || true
+    fi
+  done
 done
 
 END_TIME=$(date +%s)

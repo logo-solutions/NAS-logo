@@ -1,0 +1,62 @@
+---
+# roles/sshfs — Montage synchrone macOS ↔ Colima via SSHFS
+
+- name: "Installer sshfs dans Colima"
+  ansible.builtin.command:
+    cmd: "/opt/homebrew/bin/colima ssh 'sudo apt-get update -qq && sudo apt-get install -y -qq sshfs'"
+  register: sshfs_install
+  changed_when: sshfs_install.rc == 0
+  tags: [sshfs]
+
+- name: "Créer répertoire de montage dans Colima"
+  ansible.builtin.command:
+    cmd: "colima ssh 'mkdir -p {{ sshfs_mount_path }}'"
+  changed_when: true
+  tags: [sshfs]
+
+- name: "Configurer sudoers pour SSHFS sans password"
+  ansible.builtin.command:
+    cmd: "colima ssh \"echo 'logo ALL=(ALL) NOPASSWD: /usr/bin/mount, /usr/bin/umount' | sudo tee /etc/sudoers.d/sshfs-mount >/dev/null && sudo chmod 0440 /etc/sudoers.d/sshfs-mount\""
+  changed_when: true
+  tags: [sshfs]
+
+- name: "Démonter SSHFS si existant"
+  ansible.builtin.command:
+    cmd: "colima ssh 'sudo umount {{ sshfs_mount_path }} 2>/dev/null || true'"
+  changed_when: false
+  tags: [sshfs]
+
+- name: "Monter NAS via SSHFS (macOS → Colima)"
+  ansible.builtin.command:
+    cmd: "colima ssh 'sudo sshfs -o allow_other,reconnect,ServerAliveInterval=15,ServerAliveCountMax=3 {{ ansible_user_id }}@{{ sshfs_gateway_ip }}:{{ nfs_export }} {{ sshfs_mount_path }}'"
+  register: sshfs_mount
+  changed_when: sshfs_mount.rc == 0
+  tags: [sshfs]
+
+- name: "Vérifier montage SSHFS"
+  ansible.builtin.command:
+    cmd: "colima ssh 'mount | grep {{ sshfs_mount_path }}'"
+  register: sshfs_verify
+  changed_when: false
+  tags: [sshfs]
+
+- name: "Afficher résultat montage SSHFS"
+  ansible.builtin.debug:
+    var: sshfs_verify.stdout_lines
+  tags: [sshfs]
+
+- name: "Ajouter SSHFS à /etc/fstab (persistance)"
+  ansible.builtin.command:
+    cmd: "colima ssh \"grep -q '{{ sshfs_gateway_ip }}' /etc/fstab || echo '{{ ansible_user_id }}@{{ sshfs_gateway_ip }}:{{ nfs_export }} {{ sshfs_mount_path }} fuse.sshfs allow_other,reconnect,ServerAliveInterval=15,ServerAliveCountMax=3,_netdev 0 0' | sudo tee -a /etc/fstab >/dev/null\""
+  changed_when: true
+  tags: [sshfs]
+
+- name: "Mettre à jour vars pour utiliser SSHFS"
+  ansible.builtin.set_fact:
+    hdd_nas_volume: "{{ sshfs_mount_path }}"
+  tags: [sshfs]
+
+- name: "✅ SSHFS prêt"
+  ansible.builtin.debug:
+    msg: "Immich/Paperless utiliseront : {{ hdd_nas_volume }}"
+  tags: [sshfs]

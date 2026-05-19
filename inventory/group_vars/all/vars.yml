@@ -14,6 +14,11 @@ hdd_mount_point: /Volumes/NAS-LOGO-DATA
 # Sandbox macOS bloque NFS/SMB/SSHFS daemons → usage direct virtiofs
 # Le chemin /Volumes/NAS-LOGO-DATA est accessible dans la VM via virtiofs
 hdd_nas_volume: "{{ hdd_mount_point }}"  # /Volumes/NAS-LOGO-DATA in Colima
+use_nfs: false  # Colima utilise virtiofs, pas NFS
+nfs_mount_path: "/Volumes/NAS-LOGO-DATA"  # Placeholder (inutilisé car use_nfs=false)
+
+# Meilisearch — recherche full-text (désactivé 2026-05-19)
+meilisearch_enabled: false
 
 # Immich — instance loic-perso
 # SOURCE: immich/upload → CIBLE: personnes/loic-perso/immich/upload (structure standard Immich)
@@ -49,6 +54,9 @@ hetzner_host: "88.99.49.100"
 hetzner_user: "{{ vault_hetzner_user }}"
 hetzner_remote_path: immich-backup
 backup_daily_keep: 7
+backup_weekly_keep: 4
+backup_monthly_keep: 3
+local_backup_dir: "/Volumes/MacOS-vide/sauvegardeNAS"
 
 # Tailscale
 tailscale_hostname: macmini

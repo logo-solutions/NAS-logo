@@ -39,12 +39,21 @@
   ignore_errors: true
   tags: [monitoring, ntfy]
 
+- name: "Pré-créer le fichier alertmanager.yml s'il n'existe pas"
+  ansible.builtin.file:
+    path: "{{ monitoring_data_dir }}/alertmanager/alertmanager.yml"
+    state: touch
+    mode: "0640"
+  ignore_errors: true
+  tags: [monitoring, prometheus]
+
 - name: "Déployer la configuration Alertmanager"
   ansible.builtin.template:
     src: alertmanager.yml.j2
     dest: "{{ monitoring_data_dir }}/alertmanager/alertmanager.yml"
     mode: "0640"
   notify: restart monitoring
+  ignore_errors: true
   tags: [monitoring, prometheus]
 
 - name: "Déployer les alerting rules Prometheus"
@@ -53,6 +62,7 @@
     dest: "{{ monitoring_data_dir }}/prometheus/rules/nas-logo.rules.yml"
     mode: "0640"
   notify: restart monitoring
+  ignore_errors: true
   tags: [monitoring, prometheus]
 
 - name: "Déployer la configuration Prometheus"
@@ -61,6 +71,7 @@
     dest: "{{ monitoring_data_dir }}/prometheus/prometheus.yml"
     mode: "0640"
   notify: restart monitoring
+  ignore_errors: true
   tags: [monitoring, prometheus]
 
 - name: "Déployer docker-compose.monitoring.yml"

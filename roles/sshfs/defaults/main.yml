@@ -1,0 +1,11 @@
+---
+# roles/sshfs — Valeurs par défaut
+
+# Chemin de montage dans Colima
+sshfs_mount_path: /mnt/photos
+
+# IP gateway Colima → macOS
+sshfs_gateway_ip: 192.168.5.2
+
+# Répertoire à exporter depuis macOS
+sshfs_export_path: /Volumes/NAS-LOGO-DATA

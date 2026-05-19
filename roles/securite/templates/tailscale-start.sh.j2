@@ -1,0 +1,35 @@
+#!/bin/bash
+# Démarre Tailscale au login si non déjà connecté
+export PATH=/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin
+export HOME="/Users/{{ ansible_user_id }}"
+
+LOG_DIR="/Volumes/NAS-LOGO-DATA/journaux"
+LOG_FILE="$LOG_DIR/tailscale-start.log"
+
+# Créer le répertoire de logs s'il n'existe pas
+mkdir -p "$LOG_DIR"
+
+{
+  echo "$(date) — Vérification Tailscale..."
+
+  if /usr/local/bin/tailscale status --json 2>/dev/null | grep -q '"BackendState":"Running"'; then
+    echo "$(date) — Tailscale déjà connecté, rien à faire."
+    exit 0
+  fi
+
+  echo "$(date) — Lancement de Tailscale..."
+  /usr/local/bin/tailscale up \
+    --authkey="{{ vault_tailscale_authkey }}" \
+    --hostname="{{ tailscale_hostname }}" \
+    --advertise-tags="{{ tailscale_tags }}" \
+    --accept-dns=false \
+    --reset
+
+  if [ $? -eq 0 ]; then
+    IP=$(/usr/local/bin/tailscale status --json 2>/dev/null | grep -oP '"TailscaleIPs":\["\K[^"]+')
+    echo "$(date) — Tailscale connecté (IP: $IP)"
+  else
+    echo "$(date) — ERREUR: Tailscale n'a pas pu se connecter"
+    exit 1
+  fi
+} >> "$LOG_FILE" 2>&1
