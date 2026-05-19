@@ -11,6 +11,7 @@
     - "{{ backup_scripts_dir }}"
     - "{{ backup_log_dir }}"
     - "{{ ansible_env.HOME }}/.config/rclone"
+  ignore_errors: true
   tags: [sauvegarde]
 
 - name: "Déployer la configuration rclone"
@@ -26,6 +27,7 @@
     src: dump_db.sh.j2
     dest: "{{ backup_scripts_dir }}/nas-logo-dump-db.sh"
     mode: "0755"
+  ignore_errors: true
   tags: [sauvegarde]
 
 - name: "Déployer le script de sauvegarde rclone"
@@ -33,6 +35,7 @@
     src: backup.sh.j2
     dest: "{{ backup_scripts_dir }}/nas-logo-backup.sh"
     mode: "0755"
+  ignore_errors: true
   tags: [sauvegarde, rclone]
 
 - name: "Déployer le script de sauvegarde ciblée"
@@ -40,6 +43,7 @@
     src: backup-cible.sh.j2
     dest: "{{ backup_scripts_dir }}/nas-logo-backup-cible.sh"
     mode: "0755"
+  ignore_errors: true
   tags: [sauvegarde]
 
 - name: "Déployer le script de test de restauration"
@@ -47,6 +51,7 @@
     src: restore-test.sh.j2
     dest: "{{ backup_scripts_dir }}/nas-logo-restore-test.sh"
     mode: "0755"
+  ignore_errors: true
   tags: [sauvegarde]
 
 - name: "Déployer le script de restauration"
@@ -54,6 +59,7 @@
     src: restore.sh.j2
     dest: "{{ backup_scripts_dir }}/nas-logo-restore.sh"
     mode: "0755"
+  ignore_errors: true
   tags: [sauvegarde, restore]
 
 - name: "Déployer le script de dump Immich BD"
@@ -61,6 +67,7 @@
     src: dump-immich-db.sh.j2
     dest: "{{ backup_scripts_dir }}/nas-logo-dump-immich-db.sh"
     mode: "0755"
+  ignore_errors: true
   tags: [sauvegarde, immich]
 
 - name: "Déployer le script de backup env + conf"
@@ -68,6 +75,7 @@
     src: backup-configs.sh.j2
     dest: "{{ backup_scripts_dir }}/nas-logo-backup-configs.sh"
     mode: "0755"
+  ignore_errors: true
   tags: [sauvegarde, configs]
 
 - name: "Créer symlinks dans /usr/local/bin"
@@ -77,6 +85,7 @@
     state: link
     force: true
   become: true
+  ignore_errors: true
   loop:
     - nas-logo-dump-db.sh
     - nas-logo-dump-immich-db.sh
