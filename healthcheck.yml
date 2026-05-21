@@ -253,37 +253,129 @@
 
     # ── Sauvegarde ──────────────────────────────────────────────────────────────
 
-    - name: "Vérifier la connectivité vers Hetzner (port 22)"
+    - name: "Vérifier la connectivité SSH vers Hetzner (port 22)"
       ansible.builtin.wait_for:
         host: "{{ hetzner_host }}"
         port: 22
         timeout: 10
         state: started
+      register: hetzner_ssh_check
       tags: [health, backup]
 
-    - name: "Vérifier la fraîcheur du backup (dernière exécution < 25h)"
-      ansible.builtin.shell:
-        cmd: >
-          find {{ backup_dir }} -maxdepth 1 -name "*.dump" -newer /tmp/.nas-logo-backup-ref 2>/dev/null | wc -l | tr -d ' '
-      args:
-        creates: /tmp/.nas-logo-backup-freshness-skip
-      register: backup_freshness_skip
+    - name: "Vérifier la connectivité SFTP vers Hetzner (port 23)"
+      ansible.builtin.wait_for:
+        host: "{{ hetzner_host }}"
+        port: 23
+        timeout: 10
+        state: started
+      register: hetzner_sftp_check
+      failed_when: false
       changed_when: false
-      ignore_errors: true
+      tags: [health, backup]
+
+    - name: "ALERTE — Port SFTP 23 indisponible sur Hetzner"
+      ansible.builtin.debug:
+        msg: "ALERTE CRITIQUE : Port SFTP 23 indisponible sur {{ hetzner_host }} — backups rclone risquent d'échouer."
+      when: hetzner_sftp_check.state != 'started'
+      tags: [health, backup]
+
+    - name: "Tester la connectivité rclone vers Hetzner"
+      ansible.builtin.shell:
+        cmd: "{{ rclone_bin | default('/opt/homebrew/bin/rclone') }} lsd hetzner-crypt:current 2>&1 | head -5"
+      environment:
+        HOME: "{{ ansible_env.HOME }}"
+      register: rclone_test
+      changed_when: false
+      failed_when: false
+      tags: [health, backup]
+
+    - name: "ALERTE — rclone Hetzner inaccessible"
+      ansible.builtin.debug:
+        msg: "ALERTE : rclone ne peut pas accéder à Hetzner — {{ rclone_test.stderr | default(rclone_test.stdout) }}"
+      when: rclone_test.rc != 0
+      tags: [health, backup]
+
+    - name: "Vérifier l'existence du répertoire de backup"
+      ansible.builtin.stat:
+        path: "{{ backup_dir }}"
+      register: backup_dir_stat
+      tags: [health, backup]
+
+    - name: "Trouver le plus récent dump PostgreSQL"
+      ansible.builtin.find:
+        paths: "{{ backup_dir }}"
+        patterns: "*.dump"
+        file_type: file
+      register: backup_dumps
+      tags: [health, backup]
+
+    - name: "Récupérer les stats du dernier dump"
+      ansible.builtin.stat:
+        path: "{{ backup_dumps.files | sort(attribute='mtime', reverse=true) | first | default({}) | attr('path', default='') }}"
+      register: latest_dump_stat
+      when: backup_dumps.files | length > 0
+      tags: [health, backup]
+
+    - name: "Afficher l'état du dernier dump"
+      ansible.builtin.debug:
+        msg: >
+          Dernier dump PostgreSQL :
+          {{ (backup_dumps.files | sort(attribute='mtime', reverse=true) | first).path | basename }}
+          ({{ (latest_dump_stat.stat.size | int / 1024 / 1024) | round(1) }}MB,
+          {% set age_seconds = (ansible_date_time.epoch | int) - (latest_dump_stat.stat.mtime | int) %}
+          {% set age_hours = age_seconds // 3600 %}
+          {% if age_hours == 0 %}freshe ({{ (age_seconds // 60) }}min)
+          {% else %}{{ age_hours }}h ago
+          {% endif %})
+      when: backup_dumps.files | length > 0
+      tags: [health, backup]
+
+    - name: "ALERTE — Aucun dump PostgreSQL trouvé"
+      ansible.builtin.debug:
+        msg: "ALERTE : Aucun dump PostgreSQL trouvé dans {{ backup_dir }} — vérifier le rôle sauvegarde."
+      when: backup_dumps.files | length == 0
       tags: [health, backup]
 
     - name: "Vérifier l'âge du log de sauvegarde"
       ansible.builtin.find:
         paths: "{{ ansible_env.HOME }}/Library/Logs/nas-logo"
-        patterns: "backup.log"
+        patterns: "backup-*.log"
         age: "-25h"
         age_stamp: mtime
       register: backup_log_recent
       tags: [health, backup]
 
-    - name: "Alerte — aucune sauvegarde depuis 25h"
+    - name: "Afficher le log le plus récent"
+      ansible.builtin.find:
+        paths: "{{ ansible_env.HOME }}/Library/Logs/nas-logo"
+        patterns: "backup-*.log"
+        file_type: file
+      register: all_backup_logs
+      tags: [health, backup]
+
+    - name: "Stats du log de sauvegarde le plus récent"
+      ansible.builtin.stat:
+        path: "{{ (all_backup_logs.files | sort(attribute='mtime', reverse=true) | first | default({}) | attr('path', default='')) }}"
+      register: latest_log_stat
+      when: all_backup_logs.files | length > 0
+      tags: [health, backup]
+
+    - name: "Afficher l'état du dernier log de backup"
       ansible.builtin.debug:
-        msg: "ALERTE : le log de sauvegarde n'a pas été modifié depuis plus de 25h — vérifier la launchd job."
+        msg: >
+          Dernier log de sauvegarde :
+          {{ (all_backup_logs.files | sort(attribute='mtime', reverse=true) | first).path | basename }}
+          ({% set age_seconds = (ansible_date_time.epoch | int) - (latest_log_stat.stat.mtime | int) %}
+          {% set age_hours = age_seconds // 3600 %}
+          {% if age_hours == 0 %}freshe ({{ (age_seconds // 60) }}min ago)
+          {% else %}{{ age_hours }}h ago
+          {% endif %})
+      when: all_backup_logs.files | length > 0
+      tags: [health, backup]
+
+    - name: "ALERTE — Aucun log de sauvegarde depuis 25h"
+      ansible.builtin.debug:
+        msg: "ALERTE : Le log de sauvegarde n'a pas été modifié depuis plus de 25h — vérifier la launchd job."
       when: backup_log_recent.matched == 0
       tags: [health, backup]
 

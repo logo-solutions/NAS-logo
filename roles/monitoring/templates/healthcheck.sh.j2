@@ -1,14 +1,18 @@
 #!/bin/bash
-# nas-logo-healthcheck.sh — alerte ntfy si disque SSD > {{ alert_disk_threshold }}%
+# nas-logo-healthcheck.sh — alerte ntfy si disque SSD > {{ alert_disk_threshold }}% ou backup échoué
 # Généré par Ansible (NAS-logo)
 set -euo pipefail
 
 SSD_MOUNT="{{ ssd_mount_point }}"
 THRESHOLD="{{ alert_disk_threshold }}"
 NTFY_URL="http://localhost:{{ ntfy_port }}/{{ ntfy_topic }}"
+BACKUP_DIR="{{ backup_dir }}"
+RCLONE="{{ rclone_bin | default('/opt/homebrew/bin/rclone') }}"
+BACKUP_LOG_DIR="{{ backup_log_dir }}"
 
 usage=$(df -h "$SSD_MOUNT" 2>/dev/null | awk 'NR==2 {gsub(/%/,"",$5); print $5}')
 
+# 1. Alerte disque SSD
 if [ -z "$usage" ]; then
   curl -s -H "Title: NAS-logo SSD introuvable" \
        -H "Priority: high" \
@@ -24,4 +28,33 @@ if [ "$usage" -ge "$THRESHOLD" ]; then
        -H "Tags: rotating_light,hard_disk_drive" \
        -d "SSD utilisé à ${usage}% (seuil ${THRESHOLD}%). Libérez de l'espace." \
        "$NTFY_URL" || true
+fi
+
+# 2. Alerte sauvegarde : vérifier la fraîcheur du log
+if [ -d "$BACKUP_LOG_DIR" ]; then
+  latest_log=$(find "$BACKUP_LOG_DIR" -name "backup-*.log" -type f -printf '%T@\n' 2>/dev/null | sort -rn | head -1 | awk -F. '{print int($1)}')
+  if [ -n "$latest_log" ]; then
+    now=$(date +%s)
+    age_seconds=$((now - latest_log))
+    age_hours=$((age_seconds / 3600))
+
+    if [ "$age_hours" -gt 25 ]; then
+      curl -s -H "Title: NAS-logo Sauvegarde échouée" \
+           -H "Priority: high" \
+           -H "Tags: alarm_clock,floppy_disk" \
+           -d "Aucune sauvegarde depuis ${age_hours}h (seuil 25h). Vérifier la launchd job ou les logs." \
+           "$NTFY_URL" || true
+    fi
+  fi
+fi
+
+# 3. Alerte Hetzner SFTP : test rclone
+if command -v "$RCLONE" &> /dev/null; then
+  if ! "$RCLONE" lsd hetzner-crypt:current --max-depth=0 &>/dev/null; then
+    curl -s -H "Title: NAS-logo Hetzner SFTP inaccessible" \
+         -H "Priority: high" \
+         -H "Tags: warning,cloud" \
+         -d "rclone ne peut pas accéder à Hetzner. Vérifier le port 23 SFTP et les credentials." \
+         "$NTFY_URL" || true
+  fi
 fi
