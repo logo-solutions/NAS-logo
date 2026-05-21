@@ -176,8 +176,91 @@ This verifies:
 - All Docker containers are running
 - Mounts are accessible
 - Tailscale is connected
-- Backups are on schedule
+- Backups are on schedule (checks last backup age < 25h)
+- **Hetzner SFTP connectivity** (port 23) — critical for backups
 - Monitoring dashboards are healthy
+
+---
+
+## Docker Socket & Local Development
+
+When running Claude Code directly on the NAS (not SSH), use the Colima socket for Docker commands:
+
+```bash
+DOCKER_HOST=unix:///Users/logo/.colima/default/docker.sock docker ps
+DOCKER_HOST=unix:///Users/logo/.colima/default/docker.sock docker compose up -d
+
+# Shorter (with shell alias):
+export DOCKER_HOST=unix:///Users/logo/.colima/default/docker.sock
+docker ps  # now works directly
+```
+
+**Immich container status:**
+```bash
+DOCKER_HOST=unix:///Users/logo/.colima/default/docker.sock docker ps | grep immich
+# Should show 4 containers: immich_server, immich_redis, immich_postgres, immich_machine_learning
+```
+
+---
+
+## Logging & Artifacts
+
+All logs, reports, and temporary output must be stored in a centralized location for audit trail and future reference:
+
+```bash
+/Volumes/NAS-LOGO-DATA/journaux/
+```
+
+**What goes there:**
+- Backup logs: `backup-YYYYMMDD.log`
+- Immich-go import output: `immich-files-complete-*.txt`
+- Find/du reports: `*.txt` (size analysis)
+- Dedup/cleanup scripts: `*.log`
+- Incident analysis: `incident-*.md`
+
+**Why:** Enables traceability, incident root-cause analysis, and helps future sessions avoid repeating work.
+
+---
+
+## Known Issues & Workarounds
+
+### Immich Containers Don't Auto-Restart After Reboot
+
+**Problem:** After NAS reboot or Colima restart, Immich containers remain exited even though `docker-compose.yml` specifies `restart: unless-stopped`.
+
+**Symptom:** `make health` fails with `Connection refused` on port 2283.
+
+**Workaround:**
+```bash
+cd ~/immich
+DOCKER_HOST=unix:///Users/logo/.colima/default/docker.sock \
+  docker compose up -d
+
+# Verify:
+curl http://localhost:2283/api/server/ping  # should respond {"res":"pong"}
+```
+
+**Root cause:** Timing issue between Colima startup and container restart. VirtioFS mounts may not be ready when Docker tries to auto-restart containers on boot.
+
+**Long-term fix (P2):** Create LaunchAgent `com.nas-logo.immich` to explicitly restart containers after Colima is ready. See `roles/monitoring/templates/com.nas-logo.*.plist.j2` for pattern.
+
+---
+
+## Hetzner SFTP Connectivity
+
+**Critical:** Backups depend on port 23 (SFTP) to Hetzner being open. 
+
+**Check connectivity:**
+```bash
+rclone lsd hetzner-crypt:current --max-depth=0
+# Should list "ssd" and "hdd" directories
+```
+
+**If SFTP 23 is blocked:**
+- Check Hetzner account status (may need to unlock password reset)
+- Verify firewall/ISP not blocking port 23
+- Test with: `timeout 5 bash -c '</dev/tcp/storage-box.hetzner.com/23' && echo "OK" || echo "BLOCKED"`
+- Healthcheck will alert with "Port SFTP 23 indisponible"
 
 ---
 
@@ -187,7 +270,9 @@ This verifies:
 
 2. **SSD must be mounted** — Playbooks expect `/Volumes/logousb/SSD/NAS-LOGO-VOLUME/` to exist. If missing, `preflight` will fail loudly.
 
-3. **Docker Desktop for Mac only** — Uses `colima` socket paths and macOS-specific networking. Linux Docker won't work.
+3. **Colima only (not Docker Desktop)** — Configuration uses `colima` socket paths at `~/.colima/default/docker.sock`. Docker Desktop will cause conflicts (credsStore issues, different networking). **Never install Docker Desktop** alongside this setup.
+   - Verify: `launchctl list com.nas-logo.colima` should show it's loaded
+   - Verify: `colima status` should show "running"
 
 4. **Apple Silicon requirement** — All Homebrew bottles are ARM64. Intel Macs would need different architecture assumptions.
 
