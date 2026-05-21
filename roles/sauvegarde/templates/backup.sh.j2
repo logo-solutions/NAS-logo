@@ -77,7 +77,7 @@ $RCLONE sync "{{ ssd_mount_point }}" hetzner-crypt:current/ssd \
   --exclude "*.DS_Store" \
   --log-level INFO \
   --log-file "$LOG_FILE" \
-  --min-age 5m
+  --min-age 5m || echo "==> WARN: Sync SSD Hetzner échoué — continuer sans" | tee -a "$LOG_FILE" >&2
 
 # 4. Sync HDD vers Hetzner chiffré (fichiers Immich, Paperless, documents)
 # Exclusions : thumbs, encoded-video (reconstruits sur SSD), sources brutes déjà importées, fichiers système
@@ -97,7 +97,7 @@ $RCLONE sync "{{ hdd_nas_volume }}" hetzner-crypt:current/hdd \
   --exclude "*.DS_Store" \
   --log-level INFO \
   --log-file "$LOG_FILE" \
-  --min-age 5m
+  --min-age 5m || echo "==> WARN: Sync HDD Hetzner échoué — continuer sans" | tee -a "$LOG_FILE" >&2
 
 # 4b. Copie locale miroir → MacOS-vide/sauvegardeNAS (sans chiffrement, sans rotation)
 LOCAL_BACKUP="{{ local_backup_dir }}"
