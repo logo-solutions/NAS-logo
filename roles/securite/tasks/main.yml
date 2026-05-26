@@ -58,25 +58,28 @@
   become: true
   tags: [securite, tailscale]
 
-- name: "Déployer le LaunchAgent Tailscale"
+- name: "Déployer le LaunchDaemon Tailscale (système persistant)"
   ansible.builtin.template:
     src: com.nas-logo.tailscale.plist.j2
-    dest: "/Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.tailscale.plist"
+    dest: "/Library/LaunchDaemons/com.nas-logo.tailscale.plist"
     mode: "0644"
+  become: yes
   register: tailscale_plist
   tags: [securite, tailscale]
 
-- name: "Charger (ou recharger) le LaunchAgent Tailscale"
+- name: "Décharger le LaunchDaemon Tailscale (si existant)"
   ansible.builtin.command:
-    cmd: "launchctl bootout gui/{{ ansible_user_uid }} /Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.tailscale.plist"
+    cmd: "launchctl bootout system /Library/LaunchDaemons/com.nas-logo.tailscale.plist"
+  become: yes
   failed_when: false
   changed_when: false
   when: tailscale_plist.changed
   tags: [securite, tailscale]
 
-- name: "Activer le LaunchAgent Tailscale"
+- name: "Charger le LaunchDaemon Tailscale (système, persistant)"
   ansible.builtin.command:
-    cmd: "launchctl bootstrap gui/{{ ansible_user_uid }} /Users/{{ ansible_user_id }}/Library/LaunchAgents/com.nas-logo.tailscale.plist"
+    cmd: "launchctl bootstrap system /Library/LaunchDaemons/com.nas-logo.tailscale.plist"
+  become: yes
   register: launchctl_bootstrap
   failed_when:
     - launchctl_bootstrap.rc != 0

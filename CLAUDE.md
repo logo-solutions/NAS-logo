@@ -27,10 +27,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | **Dry-run** | `make dryrun` — preview all changes without applying |
 | **Deploy everything** | `make install` — run full provisioning (needs vault password) |
 | **System health check** | `make health` — verify all services are running |
-| **Manual backup** | `make backup` — immediately backup NAS to Hetzner |
-| **Restore from backup** | `make restore [VERSION=date]` — restore from a specific snapshot |
+| **Local backup (SSD+HDD)** | `make backup` — rsync personnes/ + immich-db/ to /Volumes/Expansion12 |
+| **Restore from Hetzner** | `make restore-list` — list available backups; `make restore [VERSION=date]` — restore |
 | **Lint playbooks** | `make lint` — validate YAML and Ansible syntax |
 | **Single role** | `ansible-playbook -i inventory/hosts site.yml --tags immich` — deploy only Immich |
+| **Gmail import (test)** | `make gmail-dry` — preview Gmail fetch without modifying inbox |
+| **Gmail import (run)** | `make gmail-run` — execute Gmail import to Paperless |
+| **Disk usage analysis** | `make scan-disks` — full disk tree analysis (stored in journaux/) |
+| **VPN connectivity test** | `make tailscale-test` — verify Tailscale access from remote network |
 
 ---
 
@@ -156,6 +160,43 @@ To restore to a specific point-in-time:
 make restore VERSION=20260415
 ```
 
+### Backup Strategy & Emergency Recovery
+
+**Current situation (as of 2026-05-19):** Hetzner SFTP port 23 is blocked, making offsite backup unavailable. All backups currently route to local `/Volumes/Expansion12/` (12TB external drive).
+
+**Critical data to backup (priority order):**
+
+1. **personnes/** (2.2 TB) — Immich photo assets + Paperless documents
+   ```bash
+   rsync -avh --progress \
+     /Volumes/NAS-LOGO-DATA/NAS-LOGO-VOLUME/personnes/ \
+     /Volumes/Expansion12/backups/NAS/personnes/
+   ```
+
+2. **immich-db/** (5-10 GB) — PostgreSQL database (non-reconstructible)
+   ```bash
+   # Stop Immich first (prevents corruption during copy)
+   cd ~/immich && docker compose down
+   
+   rsync -avh --progress \
+     /Volumes/logousb/SSD/NAS-LOGO-VOLUME/immich-db/ \
+     /Volumes/Expansion12/backups/NAS/immich-db/
+   
+   # Restart Immich
+   cd ~/immich && docker compose up -d
+   ```
+
+**Emergency rsync phases (local backup to Expansion12):**
+- **Phase 1** (54 GB) — `SauvAvril2026/` → ✅ Complete
+- **Phase 2** (~200+ GB) — `AFAIRE+tard/` subdirectories → 🔄 In progress
+- **Phase 3** (variable) — `_done/` archive subdirectories → ⏳ Queued (auto-starts after Phase 2)
+
+Monitor progress:
+```bash
+tail -f /Volumes/NAS-LOGO-DATA/journaux/rsync-chain.out
+du -sh /Volumes/Expansion12/sauvetmpo25mai/
+```
+
 ---
 
 ## Testing & Validation
@@ -244,23 +285,79 @@ curl http://localhost:2283/api/server/ping  # should respond {"res":"pong"}
 
 **Long-term fix (P2):** Create LaunchAgent `com.nas-logo.immich` to explicitly restart containers after Colima is ready. See `roles/monitoring/templates/com.nas-logo.*.plist.j2` for pattern.
 
+### Immich Job Queue Must Be Empty Before Imports
+
+**Problem:** If Immich has pending background jobs (metadata extraction, thumbnail generation, etc.), new imports via `immich-go` fail with 500 errors on search/metadata endpoints.
+
+**Check job status:**
+```bash
+# Query Immich API for pending jobs
+curl -s http://localhost:2283/api/jobs \
+  -H "x-api-key: $(grep vault_immich_api_key inventory/group_vars/vault.yml)" | jq '.jobs | length'
+# Should return 0 before importing
+```
+
+**Before running any `immich-go upload`:**
+```bash
+make health  # Includes job queue check
+```
+
+**If jobs are stuck:** Restart Immich to clear queue
+```bash
+cd ~/immich && docker compose restart immich_server
+# Wait 30 seconds for startup
+curl http://localhost:2283/api/server/ping
+```
+
+### Tailscale Persistent Daemon (Multi-User)
+
+**Problem:** Tailscale was stopping when switching macOS user accounts because it ran as a **user-level LaunchAgent** (dies with user session).
+
+**Solution:** Tailscale now runs as a **system-level LaunchDaemon** that persists across user switches and reboots.
+
+**Configuration:**
+- **LaunchDaemon:** `/Library/LaunchDaemons/com.nas-logo.tailscale.plist` (root-owned, system scope)
+- **Start script:** `/usr/local/bin/nas-logo-tailscale-start.sh`
+- **Behavior:** Checks if Tailscale is already connected; if not, re-authenticates with auth key from vault
+- **Logs:** `/Volumes/NAS-LOGO-DATA/journaux/tailscale-start.log`
+
+**Deploy via Ansible:**
+```bash
+ansible-playbook -i inventory/hosts site.yml --tags securite \
+  --vault-password-file ~/.nas-logo-vault-pass \
+  --become-password-file ~/.nas-logo-become-pass
+```
+
+**Verify LaunchDaemon is loaded:**
+```bash
+launchctl print system/com.nas-logo.tailscale
+# Should show: type = LaunchDaemon, path = /Library/LaunchDaemons/com.nas-logo.tailscale.plist
+```
+
+**Test after user switch:** Tailscale should remain connected (IP stable at 100.113.214.55).
+
 ---
 
 ## Hetzner SFTP Connectivity
 
-**Critical:** Backups depend on port 23 (SFTP) to Hetzner being open. 
+**🔴 CRITICAL ISSUE (2026-05-19 onwards):** Hetzner SFTP port 23 is **blocked**. Offsite backups to Hetzner are currently unavailable.
 
-**Check connectivity:**
+**Workaround in place:** All backups route to local `/Volumes/Expansion12/` pending Hetzner resolution.
+
+**Check connectivity (if trying to re-enable):**
 ```bash
 rclone lsd hetzner-crypt:current --max-depth=0
 # Should list "ssd" and "hdd" directories
 ```
 
-**If SFTP 23 is blocked:**
-- Check Hetzner account status (may need to unlock password reset)
-- Verify firewall/ISP not blocking port 23
-- Test with: `timeout 5 bash -c '</dev/tcp/storage-box.hetzner.com/23' && echo "OK" || echo "BLOCKED"`
-- Healthcheck will alert with "Port SFTP 23 indisponible"
+**Troubleshooting port 23 blockage:**
+- Test connectivity: `timeout 5 bash -c '</dev/tcp/storage-box.hetzner.com/23' && echo "OK" || echo "BLOCKED"`
+- Check Hetzner account status (may need to unlock account after password reset attempt)
+- Verify ISP/firewall not blocking port 23
+- Contact Hetzner support if testing confirms blockage on their end
+- `make health` will alert with "Port SFTP 23 indisponible"
+
+**Contingency:** Until Hetzner is restored, ensure `/Volumes/Expansion12/` is regularly synced to another external drive for 2-copy offsite redundancy.
 
 ---
 
@@ -346,6 +443,18 @@ rclone lsd hetzner-crypt:current --max-depth=0
 
 ---
 
+## Session Persistence & Memory
+
+Claude Code maintains an auto-memory system for this project at `/Users/logo/.claude/projects/-Volumes-logousb-SSD-Projects-NAS-logo/memory/`. This persists context across sessions:
+
+- **Incident history** — past problems and resolutions (e.g., Hetzner 2026-05-19, Immich incident 2026-05-06)
+- **Known constraints** — critical workflow rules (e.g., no `make scan`/`make import` without explicit permission)
+- **Findlists** — cached directory listings to avoid repeated `find` scans of large volumes
+
+Always check the memory index before starting a session. Key memories override generic guidance.
+
+---
+
 ## Remember
 
 - **Idempotency first** — every role must be safe to re-run
@@ -354,3 +463,6 @@ rclone lsd hetzner-crypt:current --max-depth=0
 - **Health checks after deploy** — `make health` verifies everything works
 - **One SSD mount** — entire system depends on `/Volumes/logousb/SSD/NAS-LOGO-VOLUME`
 - **Reproducible on fresh hardware** — the Ansible config is the source of truth
+- **Backup strategy in crisis mode** — Hetzner blocked; use `make backup` to Expansion12
+- **Immich job queue must be empty** — verify before running imports (500 error risk)
+- **No destructive operations without confirmation** — never rm/mv/UPDATE without asking first
