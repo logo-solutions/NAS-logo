@@ -3,11 +3,19 @@
 export PATH=/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin
 export HOME="/Users/{{ ansible_user_id }}"
 
-LOG_DIR="/Volumes/NAS-LOGO-DATA/journaux"
+LOG_DIR="~/Library/Logs/nas-logo"
 LOG_FILE="$LOG_DIR/tailscale-start.log"
 
-# Créer le répertoire de logs s'il n'existe pas
-mkdir -p "$LOG_DIR"
+# Vérifier que le volume est monté (avec timeout)
+TIMEOUT=60
+START=$(date +%s)
+until [ -d "$LOG_DIR" ]; do
+  if [ $(($(date +%s) - START)) -gt $TIMEOUT ]; then
+    echo "$(date) — ERREUR: $LOG_DIR inaccessible après ${TIMEOUT}s. Abandon."
+    exit 1
+  fi
+  sleep 2
+done
 
 {
   echo "$(date) — Vérification Tailscale..."
@@ -26,7 +34,7 @@ mkdir -p "$LOG_DIR"
     --reset
 
   if [ $? -eq 0 ]; then
-    IP=$(/usr/local/bin/tailscale status --json 2>/dev/null | grep -oP '"TailscaleIPs":\["\K[^"]+')
+    IP=$(/usr/local/bin/tailscale status --json 2>/dev/null | sed -n 's/.*"TailscaleIPs":\["\([^"]*\).*/\1/p')
     echo "$(date) — Tailscale connecté (IP: $IP)"
   else
     echo "$(date) — ERREUR: Tailscale n'a pas pu se connecter"

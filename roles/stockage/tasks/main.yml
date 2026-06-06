@@ -20,3 +20,19 @@
     - "{{ monitoring_data_dir }}/grafana"
     - "{{ backup_dir }}"
   tags: [stockage]
+
+- name: "Déployer script de montage Expansion12"
+  ansible.builtin.template:
+    src: expansion12-mount.sh.j2
+    dest: /usr/local/bin/nas-logo-expansion12-mount.sh
+    mode: "0755"
+  tags: [stockage]
+
+- name: "Déployer LaunchDaemon pour montage automatique Expansion12"
+  ansible.builtin.template:
+    src: com.nas-logo.expansion12-mount.plist.j2
+    dest: /Library/LaunchDaemons/com.nas-logo.expansion12-mount.plist
+    mode: "0644"
+  become: true
+  notify: "load launchdaemon expansion12"
+  tags: [stockage]
