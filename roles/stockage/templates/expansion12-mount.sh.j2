@@ -1,0 +1,47 @@
+#!/bin/bash
+# Monte automatiquement /Volumes/Expansion12 au démarrage si le disque est détecté
+export PATH=/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
+export HOME="/Users/{{ ansible_user_id }}"
+
+EXPANSION_DISK="Expansion12"
+LOG_DIR="~/Library/Logs/nas-logo"
+LOG_FILE="$LOG_DIR/expansion12-mount.log"
+
+# Attendre que /Volumes/NAS-LOGO-DATA soit monté (timeout 90s)
+TIMEOUT=90
+START=$(date +%s)
+until [ -d "$LOG_DIR" ]; do
+  if [ $(($(date +%s) - START)) -gt $TIMEOUT ]; then
+    echo "$(date) — ERREUR: $LOG_DIR inaccessible après ${TIMEOUT}s. Abandon."
+    exit 1
+  fi
+  sleep 2
+done
+
+{
+  echo "$(date) — Vérification montage Expansion12..."
+
+  # Vérifier si déjà monté
+  if [ -d "/Volumes/$EXPANSION_DISK" ]; then
+    echo "$(date) — /Volumes/$EXPANSION_DISK déjà monté ✓"
+    exit 0
+  fi
+
+  # Chercher le disque par UUID ou nom
+  DISK_PATH=$(diskutil list | grep -i "$EXPANSION_DISK" | awk '{print $NF}')
+
+  if [ -z "$DISK_PATH" ]; then
+    echo "$(date) — ⚠️  Disque $EXPANSION_DISK non trouvé (peut-être débranché ou endormi)"
+    exit 1
+  fi
+
+  echo "$(date) — Tentative de montage: $DISK_PATH"
+  diskutil mount "$DISK_PATH"
+
+  if [ $? -eq 0 ]; then
+    echo "$(date) — ✓ $EXPANSION_DISK monté avec succès"
+  else
+    echo "$(date) — ERREUR: Impossible de monter $EXPANSION_DISK"
+    exit 1
+  fi
+} >> "$LOG_FILE" 2>&1

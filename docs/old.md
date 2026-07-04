@@ -1,25 +1,4 @@
-# Plan de Sauvegarde Rsync — NAS-logo (2026-05-25)
-
-## Contexte
-Sauvegarde séquentielle des données critiques du NAS vers /Volumes/Expansion12 (DD 12To) suite au blocage du port SFTP Hetzner (depuis 2026-05-19). 
-Stratégie : 3 phases rsync en chaîne + backup de la BD Immich.
-
----
-
-## 🎯 OBJECTIF CONFIRMÉ : ENVOI SUR DD 12To
-**Tout le contenu de :**
-- ✅ `/Volumes/NAS-LOGO-DATA/AFAIRE+tard/` → En cours (Phase 2)
-- ✅ `/Volumes/NAS-LOGO-DATA/_done/` → À venir (Phase 3, lancera automatiquement)
-
-**Destination finale :**
-- ✅ `/Volumes/Expansion12/sauvetmpo25mai/` (DD 12To)
-
-**Statut :**
-- Phase 2 (AFAIRE+tard) : 🔄 EN COURS — À VÉRIFIER L'AVANCEMENT RÉEL
-- Phase 3 (_done) : ⏳ ATTENDRA Phase 2 (lancera automatiquement)
-
----
-
+#old
 ## ✅ FAIT (Complété)
 
 ### Phase 1 — SauvAvril2026 → Expansion12

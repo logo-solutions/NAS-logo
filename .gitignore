@@ -13,3 +13,7 @@ inventory/group_vars/**/vault.yml
 
 # Récapitulatif URLs/mots de passe en clair
 url_readme.md
+
+# Fichiers de scan/analyse disque (trop volumineux pour git)
+scripts/cleanHDDs/**/*.txt
+scripts/cleanHDDs/*.txt

@@ -1,0 +1,8 @@
+---
+- name: load launchdaemon expansion12
+  ansible.builtin.shell:
+    cmd: |
+      launchctl bootout system /Library/LaunchDaemons/com.nas-logo.expansion12-mount.plist 2>/dev/null || true
+      launchctl bootstrap system /Library/LaunchDaemons/com.nas-logo.expansion12-mount.plist
+  become: true
+  changed_when: true

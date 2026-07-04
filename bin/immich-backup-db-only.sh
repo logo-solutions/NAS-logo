@@ -20,6 +20,8 @@ BACKUP_LOCATION="${BACKUP_ROOT}/immich-backup-db-$(date +%Y%m%d-%H%M%S)"
 
 LOG_FILE="${JOURNAUX}/immich-backup-db-only-$(date +%Y%m%d-%H%M%S).log"
 
+export DOCKER_HOST=unix:///Users/logo/.colima/default/docker.sock
+
 # ============================================================================
 # TRACES DIAGNOSTIC (LaunchAgent debugging)
 # ============================================================================
